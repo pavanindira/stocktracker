@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Transactions — StockTracker{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Transactions</h2>
+        <div class="subtitle">// SALES · PURCHASES · ADJUSTMENTS</div>
+    </div>
+    <div style="display: flex; gap: 10px;">
+        <a href="/transactions/new?type=sale" class="btn btn-primary">↑ New Sale</a>
+        <a href="/transactions/new?type=purchase" class="btn btn-secondary">↓ New Purchase</a>
+    </div>
+</div>
+<div class="content">
+    <!-- Filter tabs -->
+    <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+        <a href="/transactions" class="btn btn-sm {% if not filter_type %}btn-primary{% else %}btn-secondary{% endif %}">All</a>
+        <a href="/transactions?type=sale" class="btn btn-sm {% if filter_type == 'sale' %}btn-primary{% else %}btn-secondary{% endif %}">Sales</a>
+        <a href="/transactions?type=purchase" class="btn btn-sm {% if filter_type == 'purchase' %}btn-primary{% else %}btn-secondary{% endif %}">Purchases</a>
+        <a href="/transactions?type=adjustment" class="btn btn-sm {% if filter_type == 'adjustment' %}btn-primary{% else %}btn-secondary{% endif %}">Adjustments</a>
+    </div>
+
+    <div class="card" style="padding: 0;">
+        {% if transactions %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Type</th>
+                        <th>Reference</th>
+                        <th>Items</th>
+                        <th>Total</th>
+                        <th>Date</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in transactions %}
+                    <tr>
+                        <td class="mono" style="color: var(--text-muted);">#{{ t.id }}</td>
+                        <td>
+                            {% if t.transaction_type.value == 'sale' %}
+                                <span class="badge badge-success">↑ Sale</span>
+                            {% elif t.transaction_type.value == 'purchase' %}
+                                <span class="badge badge-info">↓ Purchase</span>
+                            {% else %}
+                                <span class="badge badge-muted">⇄ Adjust</span>
+                            {% endif %}
+                        </td>
+                        <td style="color: var(--text-muted); font-size: 13px;">{{ t.reference or '—' }}</td>
+                        <td class="mono">{{ t.items | length }}</td>
+                        <td class="mono">${{ "%.2f"|format(t.total_amount) }}</td>
+                        <td class="mono" style="font-size: 12px; color: var(--text-muted);">{{ t.created_at.strftime('%b %d, %Y %H:%M') }}</td>
+                        <td>
+                            <a href="/transactions/{{ t.id }}" class="btn btn-ghost btn-sm">View →</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">⇄</div>
+            <p style="font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 8px;">No transactions yet</p>
+            <p>Record your first sale or purchase to start tracking activity.</p>
+            <br>
+            <a href="/transactions/new?type=sale" class="btn btn-primary">↑ Record Sale</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

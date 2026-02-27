@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Products — StockTracker{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Products</h2>
+        <div class="subtitle">// {{ products | length }} ITEMS IN INVENTORY</div>
+    </div>
+    <a href="/products/new" class="btn btn-primary">+ New Product</a>
+</div>
+<div class="content">
+    <form class="search-bar" method="get" action="/products">
+        <input type="text" name="search" placeholder="Search products by name…" value="{{ search }}">
+        <button type="submit" class="btn btn-secondary">Search</button>
+        {% if search %}<a href="/products" class="btn btn-ghost">Clear</a>{% endif %}
+    </form>
+
+    <div class="card" style="padding: 0;">
+        {% if products %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>SKU</th>
+                        <th>Category</th>
+                        <th>Stock</th>
+                        <th>Cost Price</th>
+                        <th>Sell Price</th>
+                        <th>Stock Value</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in products %}
+                    <tr>
+                        <td>
+                            <div style="font-weight: 700;">{{ p.name }}</div>
+                            {% if p.description %}<div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">{{ p.description[:60] }}{% if p.description|length > 60 %}…{% endif %}</div>{% endif %}
+                        </td>
+                        <td class="mono" style="color: var(--text-muted);">{{ p.sku or '—' }}</td>
+                        <td style="color: var(--text-muted); font-size: 13px;">{{ p.category or '—' }}</td>
+                        <td class="mono">
+                            <span style="color: {% if p.is_low_stock %}var(--danger){% else %}var(--text){% endif %}; font-weight: {% if p.is_low_stock %}700{% else %}400{% endif %}">
+                                {{ p.stock_quantity }}
+                            </span>
+                            <span style="color: var(--text-muted); font-size: 11px;"> {{ p.unit }}</span>
+                        </td>
+                        <td class="mono">${{ "%.2f"|format(p.cost_price) }}</td>
+                        <td class="mono">${{ "%.2f"|format(p.selling_price) }}</td>
+                        <td class="mono">${{ "%.2f"|format(p.stock_value) }}</td>
+                        <td>
+                            {% if p.is_low_stock %}
+                                <span class="badge badge-danger">Low Stock</span>
+                            {% else %}
+                                <span class="badge badge-success">OK</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div style="display: flex; gap: 8px;">
+                                <a href="/products/{{ p.id }}/edit" class="btn btn-secondary btn-sm">Edit</a>
+                                <form method="post" action="/products/{{ p.id }}/delete" onsubmit="return confirm('Delete {{ p.name }}?')">
+                                    <button type="submit" class="btn btn-danger btn-sm">Del</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">◻</div>
+            <p style="font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 8px;">No products yet</p>
+            <p>Add your first product to start tracking inventory.</p>
+            <br>
+            <a href="/products/new" class="btn btn-primary">+ Add Product</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

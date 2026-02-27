@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Reports — StockTracker{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Reports</h2>
+        <div class="subtitle">// ANALYTICS & EXPORTS</div>
+    </div>
+    <div style="display: flex; gap: 10px;">
+        <a href="/reports/export/stock" class="btn btn-secondary">↓ Export Stock CSV</a>
+        <a href="/reports/export/transactions?start_date={{ start_date }}&end_date={{ end_date }}" class="btn btn-secondary">↓ Export Transactions CSV</a>
+    </div>
+</div>
+<div class="content">
+    <!-- Date filter -->
+    <form method="get" action="/reports" style="display: flex; gap: 12px; align-items: flex-end; margin-bottom: 28px; background: var(--surface); border: 1px solid var(--border); padding: 16px 20px; border-radius: 8px;">
+        <div class="form-group" style="margin: 0;">
+            <label>From Date</label>
+            <input type="date" name="start_date" value="{{ start_date }}">
+        </div>
+        <div class="form-group" style="margin: 0;">
+            <label>To Date</label>
+            <input type="date" name="end_date" value="{{ end_date }}">
+        </div>
+        <button type="submit" class="btn btn-primary">Apply</button>
+    </form>
+
+    <!-- Period summary stats -->
+    <div class="stats-grid" style="margin-bottom: 28px;">
+        <div class="stat-card success">
+            <div class="stat-label">Total Sales</div>
+            <div class="stat-value large">${{ "%.2f"|format(total_sales) }}</div>
+            <div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); margin-top: 6px;">{{ sales_count }} transactions</div>
+        </div>
+        <div class="stat-card info">
+            <div class="stat-label">Total Purchases</div>
+            <div class="stat-value large">${{ "%.2f"|format(total_purchases) }}</div>
+            <div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); margin-top: 6px;">{{ purchases_count }} transactions</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Gross Profit</div>
+            {% set profit = total_sales - total_purchases %}
+            <div class="stat-value large" style="color: {% if profit >= 0 %}var(--success){% else %}var(--danger){% endif %}">
+                {% if profit >= 0 %}+{% endif %}${{ "%.2f"|format(profit) }}
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Current Stock Value</div>
+            <div class="stat-value large">${{ "%.2f"|format(total_stock_value) }}</div>
+            <div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); margin-top: 6px;">{{ products | length }} products</div>
+        </div>
+    </div>
+
+    <div class="grid-2">
+        <!-- Top selling products -->
+        <div class="card">
+            <div class="section-header">
+                <div class="section-title">Top Selling Products</div>
+                <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);">{{ start_date }} – {{ end_date }}</span>
+            </div>
+            {% if top_products %}
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Qty Sold</th>
+                            <th>Revenue</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in top_products %}
+                        <tr>
+                            <td style="font-weight: 600;">{{ p.name }}</td>
+                            <td class="mono">{{ "%.1f"|format(p.total_qty) }}</td>
+                            <td class="mono" style="color: var(--success);">${{ "%.2f"|format(p.total_revenue) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state" style="padding: 24px;">
+                <div class="empty-icon">◌</div>
+                <p>No sales in this period</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Current stock status -->
+        <div class="card">
+            <div class="section-header">
+                <div class="section-title">Stock Status</div>
+                <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);">{{ low_stock | length }} low</span>
+            </div>
+            {% if products %}
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Stock</th>
+                            <th>Value</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in products %}
+                        <tr>
+                            <td style="font-weight: 600; font-size: 13px;">{{ p.name }}</td>
+                            <td class="mono" style="color: {% if p.is_low_stock %}var(--danger){% else %}var(--text){% endif %}">
+                                {{ p.stock_quantity }} {{ p.unit }}
+                            </td>
+                            <td class="mono" style="font-size: 12px;">${{ "%.2f"|format(p.stock_value) }}</td>
+                            <td>
+                                {% if p.is_low_stock %}
+                                    <span class="badge badge-danger">Low</span>
+                                {% else %}
+                                    <span class="badge badge-success">OK</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state" style="padding: 24px;">
+                <div class="empty-icon">◻</div>
+                <p>No products in inventory</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

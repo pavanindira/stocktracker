@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Transaction #{{ transaction.id }} — StockTracker{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Transaction #{{ transaction.id }}</h2>
+        <div class="subtitle">// {{ transaction.transaction_type.value | upper }} · {{ transaction.created_at.strftime('%B %d, %Y at %H:%M') }}</div>
+    </div>
+    <a href="/transactions" class="btn btn-secondary">← Back</a>
+</div>
+<div class="content">
+    <div style="max-width: 720px;">
+        <div class="card" style="margin-bottom: 20px;">
+            <div class="form-grid">
+                <div>
+                    <div class="card-title">Type</div>
+                    {% if transaction.transaction_type.value == 'sale' %}
+                        <span class="badge badge-success" style="font-size: 13px; padding: 6px 14px;">↑ Sale</span>
+                    {% elif transaction.transaction_type.value == 'purchase' %}
+                        <span class="badge badge-info" style="font-size: 13px; padding: 6px 14px;">↓ Purchase</span>
+                    {% else %}
+                        <span class="badge badge-muted" style="font-size: 13px; padding: 6px 14px;">⇄ Adjustment</span>
+                    {% endif %}
+                </div>
+                <div>
+                    <div class="card-title">Total Amount</div>
+                    <div style="font-family: var(--font-mono); font-size: 24px; font-weight: 700; color: var(--accent)">${{ "%.2f"|format(transaction.total_amount) }}</div>
+                </div>
+                <div>
+                    <div class="card-title">Reference</div>
+                    <div>{{ transaction.reference or '—' }}</div>
+                </div>
+                <div>
+                    <div class="card-title">Notes</div>
+                    <div style="color: var(--text-muted);">{{ transaction.notes or '—' }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="padding: 0;">
+            <div style="padding: 16px 20px; border-bottom: 1px solid var(--border);">
+                <div class="section-title">Items ({{ transaction.items | length }})</div>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Quantity</th>
+                            <th>Unit Price</th>
+                            <th>Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in transaction.items %}
+                        <tr>
+                            <td>
+                                <div style="font-weight: 600;">{{ item.product.name }}</div>
+                                {% if item.product.sku %}<div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">{{ item.product.sku }}</div>{% endif %}
+                            </td>
+                            <td class="mono">{{ item.quantity }} {{ item.product.unit }}</td>
+                            <td class="mono">${{ "%.2f"|format(item.unit_price) }}</td>
+                            <td class="mono">${{ "%.2f"|format(item.subtotal) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="3" style="text-align: right; padding: 14px 16px; font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); letter-spacing: 2px; text-transform: uppercase;">TOTAL</td>
+                            <td class="mono" style="font-weight: 700; font-size: 16px; color: var(--accent);">${{ "%.2f"|format(transaction.total_amount) }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Register — StockTracker{% endblock %}
+{% block content %}
+<style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .auth-container { width: 100%; max-width: 460px; padding: 24px; }
+    .auth-header { margin-bottom: 32px; }
+    .auth-header .logo-mark { font-family: var(--font-mono); font-size: 10px; color: var(--accent); letter-spacing: 3px; text-transform: uppercase; display: block; margin-bottom: 6px; }
+    .auth-header h1 { font-size: 32px; font-weight: 800; letter-spacing: -1px; }
+    .auth-form { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 28px; }
+    .auth-form h2 { font-size: 18px; font-weight: 700; margin-bottom: 24px; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+    .form-hint { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
+    .auth-footer { text-align: center; margin-top: 20px; font-size: 13px; color: var(--text-muted); }
+    .auth-footer a { color: var(--accent); text-decoration: none; font-weight: 600; }
+    .btn-block { width: 100%; justify-content: center; padding: 12px; font-size: 15px; margin-top: 8px; }
+</style>
+<div class="auth-container">
+    <div class="auth-header">
+        <span class="logo-mark">// register shop</span>
+        <h1>Create Account</h1>
+    </div>
+    <div class="auth-form">
+        <h2>Register your shop</h2>
+        {% if error %}
+        <div class="alert alert-danger">⚠ {{ error }}</div>
+        {% endif %}
+        <form method="post" action="/register">
+            <div class="form-group">
+                <label>Shop Name</label>
+                <input type="text" name="shop_name" placeholder="My Amazing Shop" required autofocus>
+            </div>
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" name="username" placeholder="my-shop" required>
+                <span class="form-hint">Used to log in. No spaces.</span>
+            </div>
+            <div class="form-group">
+                <label>Email (optional)</label>
+                <input type="email" name="email" placeholder="shop@example.com">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" name="password" placeholder="••••••••" required>
+            </div>
+            <div class="form-group">
+                <label>Confirm Password</label>
+                <input type="password" name="confirm_password" placeholder="••••••••" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Create Shop →</button>
+        </form>
+    </div>
+    <div class="auth-footer">
+        Already registered? <a href="/login">Sign in</a>
+    </div>
+</div>
+{% endblock %}

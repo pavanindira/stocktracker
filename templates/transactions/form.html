@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}New {{ transaction_type | capitalize }} — StockTracker{% endblock %}
+{% block extra_head %}
+<style>
+    .items-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+    .items-table th {
+        font-family: var(--font-mono); font-size: 9px; color: var(--text-muted);
+        letter-spacing: 2px; text-transform: uppercase; padding: 8px 12px;
+        text-align: left; border-bottom: 1px solid var(--border);
+    }
+    .items-table td { padding: 8px 6px; }
+    .items-table input, .items-table select { padding: 8px 10px; font-size: 13px; }
+    .remove-row { cursor: pointer; color: var(--danger); background: none; border: none; font-size: 18px; padding: 4px 8px; }
+    .remove-row:hover { color: #ff4444; }
+    #total-display { font-family: var(--font-mono); font-size: 22px; font-weight: 700; color: var(--accent); }
+    .type-indicator {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 8px 16px; border-radius: 6px; font-weight: 700; font-size: 14px;
+        margin-bottom: 20px;
+    }
+    .type-sale { background: rgba(46,204,113,0.12); color: var(--success); border: 1px solid rgba(46,204,113,0.3); }
+    .type-purchase { background: rgba(78,205,196,0.12); color: var(--accent2); border: 1px solid rgba(78,205,196,0.3); }
+    .type-adjustment { background: rgba(255,255,255,0.07); color: var(--text-muted); border: 1px solid var(--border); }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>New {{ transaction_type | capitalize }}</h2>
+        <div class="subtitle">// RECORD STOCK {{ transaction_type | upper }}</div>
+    </div>
+    <a href="/transactions" class="btn btn-secondary">← Back</a>
+</div>
+<div class="content">
+    {% if error %}
+    <div class="alert alert-danger">⚠ {{ error }}</div>
+    {% endif %}
+
+    <div class="type-indicator type-{{ transaction_type }}">
+        {% if transaction_type == 'sale' %}↑ Sale — Stock going OUT{% elif transaction_type == 'purchase' %}↓ Purchase — Stock coming IN{% else %}⇄ Stock Adjustment{% endif %}
+    </div>
+
+    <form method="post" action="/transactions/new" id="txn-form">
+        <input type="hidden" name="transaction_type" value="{{ transaction_type }}">
+
+        <div class="card" style="margin-bottom: 20px;">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Reference / Invoice #</label>
+                    <input type="text" name="reference" placeholder="e.g. INV-001 (optional)">
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <input type="text" name="notes" placeholder="Optional notes…">
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-bottom: 20px;">
+            <div class="section-header">
+                <div class="section-title">Items</div>
+                <button type="button" class="btn btn-secondary btn-sm" id="add-row">+ Add Item</button>
+            </div>
+
+            <div class="table-wrap">
+                <table class="items-table" id="items-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 40%">Product</th>
+                            <th style="width: 15%">Quantity</th>
+                            <th style="width: 18%">Unit Price ($)</th>
+                            <th style="width: 18%">Subtotal</th>
+                            <th style="width: 9%"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="items-body">
+                        <!-- Rows added by JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+                <div>
+                    <span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); letter-spacing: 2px; text-transform: uppercase; margin-right: 16px;">TOTAL</span>
+                    <span id="total-display">$0.00</span>
+                </div>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 12px;">
+            <button type="submit" class="btn btn-primary" id="submit-btn">
+                {% if transaction_type == 'sale' %}↑ Record Sale{% elif transaction_type == 'purchase' %}↓ Record Purchase{% else %}⇄ Save Adjustment{% endif %}
+            </button>
+            <a href="/transactions" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script>
+const products = [
+    {% for p in products %}
+    { id: {{ p.id }}, name: {{ p.name | tojson }}, price: {{ p.selling_price if transaction_type == 'sale' else p.cost_price }}, stock: {{ p.stock_quantity }}, unit: {{ p.unit | tojson }} },
+    {% endfor %}
+];
+
+const txnType = {{ transaction_type | tojson }};
+
+function buildOptions() {
+    return products.map(p =>
+        `<option value="${p.id}" data-price="${p.price}" data-stock="${p.stock}" data-unit="${p.unit}">${p.name} (Stock: ${p.stock} ${p.unit})</option>`
+    ).join('');
+}
+
+let rowCount = 0;
+function addRow() {
+    rowCount++;
+    const row = document.createElement('tr');
+    row.dataset.row = rowCount;
+    row.innerHTML = `
+        <td>
+            <select name="product_id[]" class="product-select" required style="width:100%">
+                <option value="">— Select product —</option>
+                ${buildOptions()}
+            </select>
+        </td>
+        <td><input type="number" name="quantity[]" class="qty-input" step="0.01" min="0.01" value="1" required style="width:90px"></td>
+        <td><input type="number" name="unit_price[]" class="price-input" step="0.01" min="0" value="0.00" required style="width:100px"></td>
+        <td class="subtotal-cell mono" style="padding: 8px 12px; font-size: 13px;">$0.00</td>
+        <td><button type="button" class="remove-row" onclick="removeRow(this)">×</button></td>
+    `;
+    document.getElementById('items-body').appendChild(row);
+
+    const sel = row.querySelector('.product-select');
+    const qtyInput = row.querySelector('.qty-input');
+    const priceInput = row.querySelector('.price-input');
+
+    sel.addEventListener('change', () => {
+        const opt = sel.selectedOptions[0];
+        if (opt.dataset.price) {
+            priceInput.value = parseFloat(opt.dataset.price).toFixed(2);
+        }
+        updateRow(row);
+    });
+    qtyInput.addEventListener('input', () => updateRow(row));
+    priceInput.addEventListener('input', () => updateRow(row));
+}
+
+function removeRow(btn) {
+    btn.closest('tr').remove();
+    updateTotal();
+}
+
+function updateRow(row) {
+    const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
+    const price = parseFloat(row.querySelector('.price-input').value) || 0;
+    const sub = qty * price;
+    row.querySelector('.subtotal-cell').textContent = '$' + sub.toFixed(2);
+    updateTotal();
+}
+
+function updateTotal() {
+    const cells = document.querySelectorAll('.subtotal-cell');
+    let total = 0;
+    cells.forEach(c => total += parseFloat(c.textContent.replace('$', '')) || 0);
+    document.getElementById('total-display').textContent = '$' + total.toFixed(2);
+}
+
+document.getElementById('add-row').addEventListener('click', addRow);
+addRow(); // Start with one row
+
+document.getElementById('txn-form').addEventListener('submit', function(e) {
+    const rows = document.querySelectorAll('#items-body tr');
+    if (rows.length === 0) { e.preventDefault(); alert('Please add at least one item.'); }
+});
+</script>
+{% endblock %}
