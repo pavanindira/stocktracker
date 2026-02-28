@@ -1,13 +1,17 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
-from starlette.middleware.csrf import CSRFMiddleware
 from database import engine
 import models
 import os
 from dotenv import load_dotenv
 
-from routers import auth_router, dashboard, products, transactions, reports
+import auth_router
+import dashboard
+import products
+import transactions
+import reports
+from csrf import CSRFProtectionMiddleware
 
 load_dotenv()
 
@@ -22,12 +26,8 @@ if not SECRET_KEY:
     raise ValueError("SECRET_KEY environment variable is required. Set it in .env file.")
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
-# CSRF middleware
-app.add_middleware(
-    CSRFMiddleware,
-    secret_key=SECRET_KEY,
-    safe_origins=[]  # Configure appropriately for production
-)
+# CSRF protection middleware
+app.add_middleware(CSRFProtectionMiddleware, secret_key=SECRET_KEY)
 
 # Static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
