@@ -15,8 +15,10 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="StockTracker", description="Multi-shop stock management system")
 
-# Session middleware (secret key from env)
-SECRET_KEY = os.getenv("SECRET_KEY", "change-this-secret-key-in-production")
+# Session middleware (secret key from env - required in production)
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise ValueError("SECRET_KEY environment variable is required. Set it in .env file.")
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
 # Static files
