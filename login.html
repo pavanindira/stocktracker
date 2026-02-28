@@ -30,6 +30,7 @@
         <div class="alert alert-danger">⚠ {{ error }}</div>
         {% endif %}
         <form method="post" action="/login">
+            {{ csrf_token() }}
             <div class="form-group">
                 <label>Username</label>
                 <input type="text" name="username" placeholder="your-shop-username" required autofocus>

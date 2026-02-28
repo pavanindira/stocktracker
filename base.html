@@ -350,6 +350,9 @@
             .form-grid { grid-template-columns: 1fr; }
         }
     </style>
+    {% macro csrf_token() %}
+    <input type="hidden" name="csrf_token" value="{{ request.session.csrf_token }}">
+    {% endmacro %}
     {% block extra_head %}{% endblock %}
 </head>
 <body>

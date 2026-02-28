@@ -41,6 +41,7 @@
     </div>
 
     <form method="post" action="/transactions/new" id="txn-form">
+        {{ csrf_token() }}
         <input type="hidden" name="transaction_type" value="{{ transaction_type }}">
 
         <div class="card" style="margin-bottom: 20px;">

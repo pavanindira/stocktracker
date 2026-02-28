@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.middleware.csrf import CSRFMiddleware
 from database import engine
 import models
 import os
@@ -20,6 +21,13 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
     raise ValueError("SECRET_KEY environment variable is required. Set it in .env file.")
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+
+# CSRF middleware
+app.add_middleware(
+    CSRFMiddleware,
+    secret_key=SECRET_KEY,
+    safe_origins=[]  # Configure appropriately for production
+)
 
 # Static files
 app.mount("/static", StaticFiles(directory="static"), name="static")

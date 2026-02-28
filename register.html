@@ -26,6 +26,7 @@
         <div class="alert alert-danger">⚠ {{ error }}</div>
         {% endif %}
         <form method="post" action="/register">
+            {{ csrf_token() }}
             <div class="form-group">
                 <label>Shop Name</label>
                 <input type="text" name="shop_name" placeholder="My Amazing Shop" required autofocus>
