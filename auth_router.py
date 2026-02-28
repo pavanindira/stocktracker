@@ -2,8 +2,9 @@ from fastapi import APIRouter, Request, Form, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from pydantic import ValidationError
 from database import get_db
-import models, auth
+import models, auth, schemas
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
@@ -55,20 +56,31 @@ async def register_post(
     confirm_password: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    if password != confirm_password:
+    # Validate with Pydantic
+    try:
+        validated = schemas.RegisterRequest(
+            shop_name=shop_name,
+            username=username,
+            email=email,
+            password=password,
+            confirm_password=confirm_password
+        )
+    except ValidationError as e:
+        error_msg = e.errors()[0]['msg'] if e.errors() else "Validation error"
         return templates.TemplateResponse("register.html", {
-            "request": request, "error": "Passwords do not match"
+            "request": request, "error": error_msg
         })
-    existing = db.query(models.Shop).filter(models.Shop.username == username).first()
+    
+    existing = db.query(models.Shop).filter(models.Shop.username == validated.username).first()
     if existing:
         return templates.TemplateResponse("register.html", {
             "request": request, "error": "Username already taken"
         })
     shop = models.Shop(
-        name=shop_name,
-        username=username,
-        email=email or None,
-        password_hash=auth.hash_password(password)
+        name=validated.shop_name,
+        username=validated.username,
+        email=validated.email,
+        password_hash=auth.hash_password(validated.password)
     )
     db.add(shop)
     db.commit()

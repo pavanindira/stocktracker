@@ -2,8 +2,9 @@ from fastapi import APIRouter, Request, Form, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from pydantic import ValidationError
 from database import get_db
-import models, auth
+import models, auth, schemas
 
 router = APIRouter(prefix="/products")
 templates = Jinja2Templates(directory="templates")
@@ -63,17 +64,40 @@ async def product_create(
     if not shop:
         return RedirectResponse(url="/login", status_code=302)
 
+    # Validate with Pydantic
+    try:
+        validated = schemas.ProductCreate(
+            name=name,
+            sku=sku or None,
+            category=category or None,
+            description=description or None,
+            unit=unit,
+            cost_price=cost_price,
+            selling_price=selling_price,
+            stock_quantity=stock_quantity,
+            low_stock_threshold=low_stock_threshold,
+        )
+    except ValidationError as e:
+        error_msg = e.errors()[0]['msg'] if e.errors() else "Validation error"
+        products = db.query(models.Product).filter(
+            models.Product.shop_id == shop.id,
+            models.Product.is_active == True
+        ).order_by(models.Product.name).all()
+        return templates.TemplateResponse("products/index.html", {
+            "request": request, "shop": shop, "products": products, "search": "", "error": error_msg
+        })
+
     product = models.Product(
         shop_id=shop.id,
-        name=name,
-        sku=sku or None,
-        category=category or None,
-        description=description or None,
-        unit=unit,
-        cost_price=cost_price,
-        selling_price=selling_price,
-        stock_quantity=stock_quantity,
-        low_stock_threshold=low_stock_threshold,
+        name=validated.name,
+        sku=validated.sku,
+        category=validated.category,
+        description=validated.description,
+        unit=validated.unit,
+        cost_price=validated.cost_price,
+        selling_price=validated.selling_price,
+        stock_quantity=validated.stock_quantity,
+        low_stock_threshold=validated.low_stock_threshold,
     )
     db.add(product)
     db.commit()
@@ -129,10 +153,35 @@ async def product_update(
     product.category = category or None
     product.description = description or None
     product.unit = unit
-    product.cost_price = cost_price
-    product.selling_price = selling_price
-    product.stock_quantity = stock_quantity
-    product.low_stock_threshold = low_stock_threshold
+    
+    # Validate with Pydantic
+    try:
+        validated = schemas.ProductUpdate(
+            name=name,
+            sku=sku or None,
+            category=category or None,
+            description=description or None,
+            unit=unit,
+            cost_price=cost_price,
+            selling_price=selling_price,
+            stock_quantity=stock_quantity,
+            low_stock_threshold=low_stock_threshold,
+        )
+    except ValidationError as e:
+        error_msg = e.errors()[0]['msg'] if e.errors() else "Validation error"
+        return templates.TemplateResponse("products/form.html", {
+            "request": request, "shop": shop, "product": product, "error": error_msg
+        })
+
+    product.name = validated.name
+    product.sku = validated.sku
+    product.category = validated.category
+    product.description = validated.description
+    product.unit = validated.unit
+    product.cost_price = validated.cost_price
+    product.selling_price = validated.selling_price
+    product.stock_quantity = validated.stock_quantity
+    product.low_stock_threshold = validated.low_stock_threshold
     db.commit()
     return RedirectResponse(url="/products", status_code=302)
 
