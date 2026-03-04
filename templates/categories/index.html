@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Categories — StockTracker{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Categories</h2>
+        <div class="subtitle">// {{ categories | length }} CATEGORIES</div>
+    </div>
+    <a href="/categories/new" class="btn btn-primary">+ New Category</a>
+</div>
+<div class="content">
+    {% if categories %}
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+        {% for cat in categories %}
+        <div class="card" style="padding: 0; overflow: hidden;">
+            <!-- Color bar -->
+            <div style="height: 4px; background: {{ cat.color }};"></div>
+            <div style="padding: 18px 20px;">
+                <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                            <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: {{ cat.color }}; flex-shrink: 0;"></span>
+                            <span style="font-weight: 800; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ cat.name }}</span>
+                        </div>
+                        {% if cat.description %}
+                        <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px; line-height: 1.5;">
+                            {{ cat.description[:80] }}{% if cat.description|length > 80 %}…{% endif %}
+                        </div>
+                        {% endif %}
+                        <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">
+                            {{ cat.product_count }} product{% if cat.product_count != 1 %}s{% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border);">
+                    <a href="/categories/{{ cat.id }}/edit" class="btn btn-secondary btn-sm">Edit</a>
+                    <a href="/products?category_id={{ cat.id }}" class="btn btn-ghost btn-sm">View Products →</a>
+                    <form method="post" action="/categories/{{ cat.id }}/delete" style="margin-left: auto;"
+                          onsubmit="return confirm('Delete \'{{ cat.name }}\'? Products in this category will become uncategorised.')">
+                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card">
+        <div class="empty-state">
+            <div class="empty-icon">◫</div>
+            <p style="font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 8px;">No categories yet</p>
+            <p>Create categories to organise your products.</p>
+            <br>
+            <a href="/categories/new" class="btn btn-primary">+ New Category</a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

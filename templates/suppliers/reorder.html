@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Reorder Suggestions — StockTracker{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Reorder Suggestions</h2>
+        <div class="subtitle">// {{ total_low }} PRODUCT{{ 'S' if total_low != 1 }} AT OR BELOW THRESHOLD</div>
+    </div>
+    <a href="/suppliers" class="btn btn-secondary">← Suppliers</a>
+</div>
+<div class="content">
+
+{% if total_low == 0 %}
+<div class="empty-state card">
+    <div class="empty-icon">✅</div>
+    <p style="font-weight:700;font-size:16px;margin-bottom:8px;">Stock levels look good</p>
+    <p>No products are currently at or below their low-stock threshold.</p>
+</div>
+{% else %}
+
+{% for group in by_supplier %}
+{% set s = group.supplier %}
+{% set prods = group.products %}
+<div class="card" style="margin-bottom:24px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
+        <div>
+            <div style="font-weight:800;font-size:16px;">
+                <a href="/suppliers/{{ s.id }}" style="color:var(--accent);text-decoration:none;">{{ s.name }}</a>
+            </div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">
+                {% if s.contact_name %}{{ s.contact_name }}{% endif %}
+                {% if s.phone %} · {{ s.phone }}{% endif %}
+                {% if s.email %} · <a href="mailto:{{ s.email }}" style="color:var(--text-muted);">{{ s.email }}</a>{% endif %}
+                {% if s.lead_time_days %} · Lead time: {{ s.lead_time_days }}d{% endif %}
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;">
+            {% if s.email %}
+            <a href="mailto:{{ s.email }}?subject=Purchase Order — {{ shop.name }}&body=Hi {{ s.contact_name or s.name }},%0D%0A%0D%0APlease supply the following items:%0D%0A{% for p in prods %}{{ p.name }}%20×%20{{ p.reorder_quantity | int if p.reorder_quantity else '?' }}%20{{ p.unit }}%0D%0A{% endfor %}%0D%0AThank you,%0D%0A{{ shop.name }}"
+               class="btn btn-secondary">✉ Email Order</a>
+            {% endif %}
+            <a href="/transactions/new?type=purchase&supplier_id={{ s.id }}" class="btn btn-primary">+ Create Purchase</a>
+        </div>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr><th>Product</th><th>SKU</th><th>System Stock</th><th>Threshold</th><th>Deficit</th><th>Reorder Qty</th></tr>
+            </thead>
+            <tbody>
+            {% for p in prods %}
+            <tr>
+                <td style="font-weight:700;">{{ p.name }}</td>
+                <td class="mono" style="font-size:12px;color:var(--text-muted);">{{ p.sku or '—' }}</td>
+                <td class="mono" style="color:var(--danger);font-weight:700;">
+                    {{ p.stock_quantity | int if p.stock_quantity == p.stock_quantity | int else "%.1f"|format(p.stock_quantity) }} {{ p.unit }}
+                </td>
+                <td class="mono" style="font-size:12px;">{{ p.low_stock_threshold | int }}</td>
+                <td class="mono" style="color:var(--danger);font-weight:700;">
+                    {{ (p.low_stock_threshold - p.stock_quantity) | round(1) | int }}
+                </td>
+                <td class="mono" style="font-weight:700;color:var(--accent);">
+                    {{ p.reorder_quantity | int if p.reorder_quantity else '—' }}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endfor %}
+
+{% if no_supplier %}
+<div class="card" style="margin-bottom:24px;">
+    <div style="margin-bottom:16px;">
+        <div style="font-weight:800;font-size:16px;color:var(--text-muted);">⚠ No Supplier Assigned</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Edit these products to assign a preferred supplier.</div>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Product</th><th>Stock</th><th>Threshold</th><th></th></tr></thead>
+            <tbody>
+            {% for p in no_supplier %}
+            <tr>
+                <td style="font-weight:700;">{{ p.name }}</td>
+                <td class="mono" style="color:var(--danger);font-weight:700;">{{ p.stock_quantity }} {{ p.unit }}</td>
+                <td class="mono" style="font-size:12px;">{{ p.low_stock_threshold | int }}</td>
+                <td><a href="/products/{{ p.id }}/edit" class="btn btn-secondary btn-sm">Assign Supplier</a></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Stocktake Complete — StockTracker{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div><h2>Stocktake Complete</h2><div class="subtitle">// {{ st.name }}</div></div>
+    <a href="/stocktake" class="btn btn-secondary">← All Stocktakes</a>
+</div>
+<div class="content"><div style="max-width:560px;">
+<div class="card" style="text-align:center;padding:40px;">
+    <div style="font-size:52px;margin-bottom:16px;">✅</div>
+    <h3 style="font-size:22px;font-weight:800;margin-bottom:8px;">Stocktake Committed</h3>
+    <p style="color:var(--text-muted);margin-bottom:24px;">
+        {{ adjusted | length }} product{{ 's' if adjusted | length != 1 }}
+        adjusted · {{ st.completed_at.strftime('%d %B %Y at %H:%M') if st.completed_at }}
+    </p>
+    {% if adjusted %}
+    <div class="card" style="padding:0;margin-bottom:24px;text-align:left;">
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Product</th><th>Was</th><th>Now</th><th>Variance</th></tr></thead>
+                <tbody>
+                {% for item in adjusted %}
+                <tr>
+                    <td style="font-weight:700;">{{ item.product.name }}</td>
+                    <td class="mono">{{ item.system_quantity }}</td>
+                    <td class="mono" style="font-weight:700;">{{ item.counted_quantity }}</td>
+                    <td>
+                        <span class="badge {% if item.variance > 0 %}badge-success{% else %}badge-danger{% endif %}"
+                              style="font-family:var(--font-mono);">
+                            {% if item.variance > 0 %}+{% endif %}{{ item.variance | round(2) }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+    <div style="display:flex;gap:12px;justify-content:center;">
+        <a href="/products" class="btn btn-primary">View Products →</a>
+        <a href="/stocktake/new" class="btn btn-secondary">New Stocktake</a>
+    </div>
+</div>
+</div></div>
+{% endblock %}

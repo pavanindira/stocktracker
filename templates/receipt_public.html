@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receipt #{{ txn.id }} — {{ shop.name }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #f0f2f8;
+            --surface: #ffffff;
+            --accent: #f5a623;
+            --text: #1a1d27;
+            --muted: #7880a0;
+            --border: #e0e3f0;
+            --success: #2ecc71;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: var(--bg);
+            font-family: 'Syne', sans-serif;
+            color: var(--text);
+            min-height: 100vh;
+            padding: 20px 16px 60px;
+        }
+
+        .wrapper {
+            max-width: 480px;
+            margin: 0 auto;
+        }
+
+        /* ── Top bar ── */
+        .top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+        .top-bar .brand {
+            font-size: 12px;
+            color: var(--muted);
+            letter-spacing: 1px;
+        }
+        .top-bar .actions {
+            display: flex;
+            gap: 8px;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-family: 'Syne', sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            text-decoration: none;
+            cursor: pointer;
+            border: none;
+            transition: opacity 0.15s;
+        }
+        .btn:hover { opacity: 0.85; }
+        .btn-accent { background: var(--accent); color: #000; }
+        .btn-outline {
+            background: transparent;
+            border: 1.5px solid var(--border);
+            color: var(--muted);
+        }
+
+        /* ── Receipt card ── */
+        .receipt {
+            background: var(--surface);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.10);
+        }
+
+        /* Header */
+        .receipt-header {
+            background: #0f1117;
+            padding: 32px 28px 24px;
+            text-align: center;
+        }
+        .receipt-header .logomark {
+            font-family: 'Space Mono', monospace;
+            color: var(--accent);
+            font-size: 28px;
+            display: block;
+            margin-bottom: 8px;
+        }
+        .receipt-header .shop-name {
+            color: #fff;
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.3px;
+        }
+        .receipt-header .receipt-label {
+            font-family: 'Space Mono', monospace;
+            color: var(--muted);
+            font-size: 10px;
+            letter-spacing: 4px;
+            margin-top: 4px;
+        }
+
+        /* Meta row */
+        .receipt-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border);
+        }
+        .receipt-meta .txn-id {
+            font-weight: 800;
+            font-size: 15px;
+        }
+        .receipt-meta .txn-date {
+            font-family: 'Space Mono', monospace;
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 2px;
+        }
+        .type-badge {
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-family: 'Space Mono', monospace;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        .type-sale     { background: rgba(46,204,113,0.12); color: #2ecc71; border: 1px solid rgba(46,204,113,0.3); }
+        .type-purchase { background: rgba(78,205,196,0.12); color: #4ecdc4; border: 1px solid rgba(78,205,196,0.3); }
+        .type-adjustment { background: rgba(124,106,247,0.12); color: #7c6af7; border: 1px solid rgba(124,106,247,0.3); }
+
+        /* Items */
+        .items-section { padding: 20px 24px 0; }
+        .items-header {
+            display: grid;
+            grid-template-columns: 1fr 50px 80px;
+            gap: 8px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 4px;
+        }
+        .items-header span {
+            font-family: 'Space Mono', monospace;
+            font-size: 10px;
+            color: var(--muted);
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+        }
+        .items-header span:nth-child(2) { text-align: center; }
+        .items-header span:nth-child(3) { text-align: right; }
+
+        .item-row {
+            display: grid;
+            grid-template-columns: 1fr 50px 80px;
+            gap: 8px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+            align-items: center;
+        }
+        .item-row:last-child { border-bottom: none; }
+        .item-name { font-weight: 700; font-size: 14px; }
+        .item-unit-price {
+            font-size: 11px;
+            color: var(--muted);
+            font-family: 'Space Mono', monospace;
+            margin-top: 2px;
+        }
+        .item-qty {
+            text-align: center;
+            font-family: 'Space Mono', monospace;
+            font-weight: 700;
+        }
+        .item-subtotal {
+            text-align: right;
+            font-family: 'Space Mono', monospace;
+            font-weight: 700;
+        }
+
+        /* Totals */
+        .totals-section {
+            padding: 16px 24px;
+            border-top: 1px solid var(--border);
+        }
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 0;
+            font-size: 14px;
+        }
+        .total-row .label { color: var(--muted); }
+        .total-row .value { font-family: 'Space Mono', monospace; font-weight: 700; }
+        .total-grand {
+            margin-top: 10px;
+            padding: 12px 16px;
+            background: var(--accent);
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .total-grand .label { font-weight: 800; font-size: 15px; color: #000; }
+        .total-grand .value {
+            font-family: 'Space Mono', monospace;
+            font-size: 20px;
+            font-weight: 700;
+            color: #000;
+        }
+
+        /* Footer */
+        .receipt-footer {
+            text-align: center;
+            padding: 20px 24px 24px;
+            border-top: 1px solid var(--border);
+        }
+        .receipt-footer .thank-you {
+            font-style: italic;
+            color: var(--muted);
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+        .receipt-footer .shop-footer {
+            font-family: 'Space Mono', monospace;
+            font-size: 11px;
+            color: var(--muted);
+            letter-spacing: 1px;
+        }
+
+        /* Accent strip */
+        .accent-strip {
+            height: 6px;
+            background: var(--accent);
+        }
+
+        /* Verified badge */
+        .verified {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin-top: 20px;
+            color: var(--muted);
+            font-size: 12px;
+            font-family: 'Space Mono', monospace;
+        }
+        .verified-dot {
+            width: 8px; height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+        }
+
+        /* Copy toast */
+        #copy-toast {
+            position: fixed;
+            bottom: 24px; left: 50%;
+            transform: translateX(-50%) translateY(80px);
+            background: #1a1d27;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 700;
+            transition: transform 0.3s ease;
+            z-index: 100;
+            pointer-events: none;
+        }
+        #copy-toast.show { transform: translateX(-50%) translateY(0); }
+
+        @media print {
+            body { background: #fff; padding: 0; }
+            .top-bar, .verified, #copy-toast { display: none; }
+            .receipt { box-shadow: none; border-radius: 0; }
+        }
+    </style>
+</head>
+<body>
+<div class="wrapper">
+
+    <!-- Top bar -->
+    <div class="top-bar">
+        <span class="brand">StockTracker · Verified Receipt</span>
+        <div class="actions">
+            <button class="btn btn-outline" onclick="copyLink()">⎘ Copy Link</button>
+            <a href="/receipt/{{ token }}/pdf" class="btn btn-accent">⬇ PDF</a>
+        </div>
+    </div>
+
+    <!-- Receipt card -->
+    <div class="receipt">
+        <div class="receipt-header">
+            <span class="logomark">▦</span>
+            <div class="shop-name">{{ shop.name }}</div>
+            <div class="receipt-label">OFFICIAL RECEIPT</div>
+        </div>
+
+        <div class="receipt-meta">
+            <div>
+                <div class="txn-id">Transaction #{{ txn.id }}</div>
+                <div class="txn-date">
+                    {{ txn.created_at.strftime('%d %B %Y  at  %H:%M') if txn.created_at else '—' }}
+                </div>
+                {% if txn.reference %}
+                <div class="txn-date" style="margin-top:2px;">Ref: {{ txn.reference }}</div>
+                {% endif %}
+            </div>
+            <div class="type-badge type-{{ txn.transaction_type.value }}">
+                {{ txn.transaction_type.value }}
+            </div>
+        </div>
+
+        <div class="items-section">
+            <div class="items-header">
+                <span>ITEM</span>
+                <span>QTY</span>
+                <span>SUBTOTAL</span>
+            </div>
+            {% for item in txn.items %}
+            <div class="item-row">
+                <div>
+                    <div class="item-name">
+                        {{ item.product.name if item.product else 'Product #' ~ item.product_id }}
+                    </div>
+                    <div class="item-unit-price">
+                        ${{ "%.2f"|format(item.unit_price) }}
+                        {% if item.product %} / {{ item.product.unit }}{% endif %}
+                    </div>
+                    {% if item.lot_number %}
+                    <div style="font-family:monospace;font-size:10px;color:#aaa;margin-top:1px;">
+                        Lot: {{ item.lot_number }}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="item-qty">
+                    ×{{ item.quantity|int if item.quantity == item.quantity|int else "%.1f"|format(item.quantity) }}
+                </div>
+                <div class="item-subtotal">${{ "%.2f"|format(item.subtotal) }}</div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="totals-section">
+            <div class="total-row">
+                <span class="label">Subtotal</span>
+                <span class="value">${{ "%.2f"|format(subtotal) }}</span>
+            </div>
+            {% if txn.tax_rate and txn.tax_rate > 0 %}
+            <div class="total-row">
+                <span class="label">Tax ({{ "%.0f"|format(txn.tax_rate) }}%)</span>
+                <span class="value">${{ "%.2f"|format(txn.tax_amount) }}</span>
+            </div>
+            {% endif %}
+            <div class="total-grand">
+                <span class="label">TOTAL</span>
+                <span class="value">${{ "%.2f"|format(txn.total_amount) }}</span>
+            </div>
+        </div>
+
+        <div class="receipt-footer">
+            <div class="thank-you">Thank you for your business!</div>
+            <div class="shop-footer">{{ shop.name }}</div>
+        </div>
+
+        <div class="accent-strip"></div>
+    </div>
+
+    <!-- Verified badge -->
+    <div class="verified">
+        <div class="verified-dot"></div>
+        Verified · Transaction #{{ txn.id }} · {{ shop.name }}
+    </div>
+
+</div>
+
+<div id="copy-toast">Link copied to clipboard ✓</div>
+
+<script>
+function copyLink() {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+        const t = document.getElementById('copy-toast');
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 2400);
+    });
+}
+</script>
+</body>
+</html>

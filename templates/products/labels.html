@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+{% block title %}Print Labels — StockTracker{% endblock %}
+
+{% block extra_head %}
+<style>
+    .label-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 10px;
+        margin-top: 16px;
+    }
+    .label-card {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 16px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        cursor: pointer;
+        transition: border-color 0.15s, background 0.15s;
+        user-select: none;
+    }
+    .label-card:hover { background: var(--surface2); }
+    .label-card.selected {
+        border-color: var(--accent);
+        background: rgba(245, 166, 35, 0.06);
+    }
+    .label-card input[type="checkbox"] {
+        width: 16px; height: 16px;
+        accent-color: var(--accent);
+        flex-shrink: 0;
+        cursor: pointer;
+    }
+    .label-card .product-info { flex: 1; min-width: 0; }
+    .label-card .product-name {
+        font-weight: 700;
+        font-size: 14px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .label-card .product-meta {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 2px;
+    }
+    .label-card .product-price {
+        font-family: var(--font-mono);
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--accent);
+        flex-shrink: 0;
+    }
+
+    /* Label preview mockup */
+    .label-preview {
+        width: 200px;
+        height: 120px;
+        border: 1.5px solid var(--border);
+        border-radius: 6px;
+        background: #fff;
+        display: flex;
+        overflow: hidden;
+        flex-shrink: 0;
+    }
+    .label-preview .qr-area {
+        width: 88px;
+        background: #f5f5f8;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-right: 1px solid #e0e0e8;
+    }
+    .label-preview .qr-mock {
+        width: 64px; height: 64px;
+        background: repeating-conic-gradient(#333 0% 25%, white 0% 50%) 0 0 / 8px 8px;
+        border-radius: 2px;
+    }
+    .label-preview .text-area {
+        flex: 1;
+        padding: 6px 8px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .label-preview .lp-shop {
+        font-size: 7px;
+        color: #aaa;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+    }
+    .label-preview .lp-name {
+        font-size: 10px;
+        font-weight: 800;
+        color: #111;
+        line-height: 1.2;
+    }
+    .label-preview .lp-cat {
+        font-size: 7px;
+        font-weight: 700;
+        padding: 1px 5px;
+        border-radius: 3px;
+        display: inline-block;
+        margin-top: 2px;
+    }
+    .label-preview .lp-price {
+        font-size: 14px;
+        font-weight: 900;
+        color: #111;
+    }
+    .label-preview .lp-sku {
+        font-size: 7px;
+        color: #aaa;
+        font-family: monospace;
+    }
+    .label-preview .lp-strip {
+        height: 5px;
+        width: 100%;
+    }
+
+    .sticky-toolbar {
+        position: sticky;
+        bottom: 0;
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+        padding: 14px 36px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        z-index: 50;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Print Labels</h2>
+        <div class="subtitle">// 50×30mm QR LABELS · 1 PER PRODUCT</div>
+    </div>
+    <a href="/products" class="btn btn-secondary">← Back to Products</a>
+</div>
+
+<div class="content" style="padding-bottom: 80px;">
+
+    <!-- Label preview -->
+    <div style="margin-bottom: 24px;">
+        <div class="card-title">LABEL PREVIEW</div>
+        <div style="display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap;">
+            <div class="label-preview">
+                <div class="qr-area"><div class="qr-mock"></div></div>
+                <div class="text-area">
+                    <div>
+                        <div class="lp-shop">{{ shop.name }}</div>
+                        <div class="lp-name">Product Name</div>
+                        <div>
+                            <span class="lp-cat" style="background: #7c6af722; color: #7c6af7; border: 1px solid #7c6af744;">Category</span>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="lp-price">$9.99</div>
+                        <div class="lp-sku">SKU-12345678</div>
+                    </div>
+                    <div class="lp-strip" style="background: #f5a623;"></div>
+                </div>
+            </div>
+            <div style="color: var(--text-muted); font-size: 13px; max-width: 320px; line-height: 1.7;">
+                <strong style="color: var(--text);">50 × 30mm labels</strong><br>
+                Compatible with Dymo LabelWriter, Brother QL-series, and any printer that supports custom paper sizes.<br><br>
+                One label is generated per selected product. The QR code encodes the product's SKU or barcode.
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter bar -->
+    <form method="get" action="/products/labels" class="search-bar">
+        <input type="text" name="search" placeholder="Filter products…" value="{{ search }}">
+        <select name="category_id" onchange="this.form.submit()" style="max-width: 200px;">
+            <option value="">All Categories</option>
+            {% for cat in categories %}
+            <option value="{{ cat.id }}" {% if selected_category == cat.id|string %}selected{% endif %}>
+                {{ cat.name }}
+            </option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-secondary">Filter</button>
+        {% if search or selected_category %}
+        <a href="/products/labels" class="btn btn-ghost">Clear</a>
+        {% endif %}
+    </form>
+
+    <!-- Select all / none -->
+    <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 12px;">
+        <button type="button" onclick="selectAll()" class="btn btn-ghost" style="padding: 6px 10px; font-size: 12px;">
+            ☑ Select All
+        </button>
+        <button type="button" onclick="selectNone()" class="btn btn-ghost" style="padding: 6px 10px; font-size: 12px;">
+            ☐ Deselect All
+        </button>
+        <span id="count-label" style="color: var(--text-muted); font-family: var(--font-mono); font-size: 11px;">
+            0 selected
+        </span>
+    </div>
+
+    <!-- Product cards -->
+    <form method="post" action="/products/labels/print" id="label-form">
+        {% if products %}
+        <div class="label-grid">
+            {% for p in products %}
+            <label class="label-card" id="card-{{ p.id }}" onclick="toggleCard({{ p.id }})">
+                <input type="checkbox" name="product_ids" value="{{ p.id }}"
+                       id="chk-{{ p.id }}" onchange="updateCount()">
+                <div class="product-info">
+                    <div class="product-name">{{ p.name }}</div>
+                    <div class="product-meta">
+                        {% if p.category_obj %}
+                        <span style="color: {{ p.category_obj.color }}; font-weight: 700;">
+                            {{ p.category_obj.name }}
+                        </span>
+                        &nbsp;·&nbsp;
+                        {% endif %}
+                        {% if p.sku %}{{ p.sku }}{% else %}<span style="opacity:0.5">No SKU</span>{% endif %}
+                    </div>
+                </div>
+                <div class="product-price">${{ "%.2f"|format(p.selling_price) }}</div>
+            </label>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state card">
+            <div class="empty-icon">🏷</div>
+            <p>No products found.</p>
+        </div>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Sticky bottom toolbar -->
+<div class="sticky-toolbar">
+    <span id="toolbar-count" style="font-family: var(--font-mono); font-size: 13px; color: var(--text-muted);">
+        0 products selected
+    </span>
+    <div style="flex: 1;"></div>
+    <button type="submit" form="label-form" id="print-btn"
+            class="btn btn-primary" disabled
+            onclick="return validateSelection()">
+        ⬇ Download Labels PDF
+    </button>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function updateCount() {
+    const checked = document.querySelectorAll('input[name="product_ids"]:checked');
+    const n = checked.length;
+    document.getElementById('count-label').textContent = n + ' selected';
+    document.getElementById('toolbar-count').textContent =
+        n === 0 ? '0 products selected'
+        : n === 1 ? '1 product selected — 1 label will be generated'
+        : n + ' products selected — ' + n + ' labels will be generated';
+    document.getElementById('print-btn').disabled = n === 0;
+
+    // Update card highlight
+    document.querySelectorAll('input[name="product_ids"]').forEach(chk => {
+        const card = document.getElementById('card-' + chk.value);
+        card.classList.toggle('selected', chk.checked);
+    });
+}
+
+function toggleCard(id) {
+    // Click is on the label, let native checkbox toggle, then update
+    setTimeout(updateCount, 0);
+}
+
+function selectAll() {
+    document.querySelectorAll('input[name="product_ids"]').forEach(c => c.checked = true);
+    updateCount();
+}
+
+function selectNone() {
+    document.querySelectorAll('input[name="product_ids"]').forEach(c => c.checked = false);
+    updateCount();
+}
+
+function validateSelection() {
+    const n = document.querySelectorAll('input[name="product_ids"]:checked').length;
+    if (n === 0) { alert('Select at least one product.'); return false; }
+    return true;
+}
+</script>
+{% endblock %}

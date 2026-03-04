@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Sign In — StockTracker{% endblock %}
+{% block content %}
+<style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--bg); }
+    .auth-container { width: 100%; max-width: 420px; padding: 24px; }
+    .auth-header { margin-bottom: 32px; }
+    .auth-header .logo-mark { font-family: var(--font-mono); font-size: 10px; color: var(--accent); letter-spacing: 3px; text-transform: uppercase; display: block; margin-bottom: 6px; }
+    .auth-header h1 { font-size: 32px; font-weight: 800; letter-spacing: -1px; }
+    .auth-header p { color: var(--text-muted); font-size: 14px; margin-top: 6px; }
+    .auth-form { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 28px; }
+    .auth-form h2 { font-size: 18px; font-weight: 700; margin-bottom: 24px; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+    .btn-block { width: 100%; justify-content: center; padding: 12px; font-size: 15px; margin-top: 8px; }
+    .auth-note { text-align: center; margin-top: 20px; font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); }
+</style>
+<div class="auth-container">
+    <div class="auth-header">
+        <span class="logo-mark">// inventory system</span>
+        <h1>StockTracker</h1>
+        <p>Sign in with your shop credentials</p>
+    </div>
+    <div class="auth-form">
+        <h2>Sign in</h2>
+        {% if error %}
+        <div class="alert alert-danger">⚠ {{ error }}</div>
+        {% endif %}
+        <form method="post" action="/login">
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" name="username" placeholder="your-username" required autofocus autocomplete="username">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" name="password" placeholder="••••••••" required autocomplete="current-password">
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Sign In →</button>
+        </form>
+    </div>
+    <div class="auth-note">
+        Access is by invitation only.<br>Contact your administrator to get an account.
+    </div>
+</div>
+{% endblock %}

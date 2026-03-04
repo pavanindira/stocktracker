@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Review Stocktake — {{ st.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Review: {{ st.name }}</h2>
+        <div class="subtitle">// VARIANCE SUMMARY · CONFIRM BEFORE COMMITTING</div>
+    </div>
+    <div style="display:flex;gap:10px;">
+        {% if st.status.value != 'completed' %}
+        <a href="/stocktake/{{ st.id }}" class="btn btn-secondary">← Back to Count</a>
+        {% else %}
+        <a href="/stocktake" class="btn btn-secondary">← Stocktakes</a>
+        {% endif %}
+    </div>
+</div>
+<div class="content">
+
+<div class="stats-grid" style="margin-bottom:24px;">
+    <div class="stat-card {% if variances | length > 0 %}danger{% else %}success{% endif %}">
+        <div class="stat-label">Variances</div>
+        <div class="stat-value">{{ variances | length }}</div>
+    </div>
+    <div class="stat-card success">
+        <div class="stat-label">Matched</div>
+        <div class="stat-value">{{ matched | length }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Uncounted</div>
+        <div class="stat-value" style="color:{% if uncounted | length > 0 %}var(--accent){% else %}var(--success){% endif %};">{{ uncounted | length }}</div>
+    </div>
+    <div class="stat-card {% if value_impact < 0 %}danger{% elif value_impact > 0 %}{% else %}success{% endif %}">
+        <div class="stat-label">Stock Value Impact</div>
+        <div class="stat-value" style="font-size:20px;color:{% if value_impact < 0 %}var(--danger){% elif value_impact > 0 %}var(--success){% else %}var(--text-muted){% endif %};">
+            {% if value_impact >= 0 %}+{% endif %}${{ "%.2f"|format(value_impact) }}
+        </div>
+    </div>
+</div>
+
+{% if variances %}
+<div class="card" style="padding:0;margin-bottom:24px;">
+    <div style="padding:16px 20px 0;"><div class="card-title" style="color:var(--danger);">⚠ PRODUCTS WITH VARIANCES</div></div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr><th>Product</th><th>System Qty</th><th>Counted Qty</th><th>Variance</th><th>Value Impact</th><th>Notes</th></tr>
+            </thead>
+            <tbody>
+            {% for item in variances | sort(attribute='variance') %}
+            <tr style="background:{% if item.variance > 0 %}rgba(46,204,113,0.04){% else %}rgba(231,76,60,0.04){% endif %}">
+                <td style="font-weight:700;">{{ item.product.name }}
+                    {% if item.product.sku %}<div class="mono" style="font-size:11px;color:var(--text-muted);">{{ item.product.sku }}</div>{% endif %}
+                </td>
+                <td class="mono">{{ item.system_quantity }} {{ item.product.unit }}</td>
+                <td class="mono" style="font-weight:700;">{{ item.counted_quantity }} {{ item.product.unit }}</td>
+                <td>
+                    <span class="badge {% if item.variance > 0 %}badge-success{% else %}badge-danger{% endif %}" style="font-family:var(--font-mono);">
+                        {% if item.variance > 0 %}+{% endif %}{{ item.variance | round(2) }}
+                    </span>
+                </td>
+                <td class="mono" style="color:{% if item.variance > 0 %}var(--success){% else %}var(--danger){% endif %};">
+                    {% if item.variance > 0 %}+{% endif %}${{ "%.2f"|format(item.variance * item.product.cost_price) }}
+                </td>
+                <td style="font-size:12px;color:var(--text-muted);">{{ item.notes or '—' }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% if uncounted %}
+<div class="card" style="padding:0;margin-bottom:24px;">
+    <div style="padding:16px 20px 0;"><div class="card-title" style="color:var(--accent);">⏩ UNCOUNTED PRODUCTS (will be skipped)</div></div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Product</th><th>System Qty</th><th></th></tr></thead>
+            <tbody>
+            {% for item in uncounted %}
+            <tr>
+                <td style="font-weight:600;">{{ item.product.name }}</td>
+                <td class="mono">{{ item.system_quantity }} {{ item.product.unit }}</td>
+                <td><a href="/stocktake/{{ st.id }}?search={{ item.product.name | urlencode }}" class="btn btn-ghost btn-sm">Count Now</a></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% if st.status.value != 'completed' %}
+<div class="card" style="padding:20px;border:1.5px solid var(--accent);">
+    <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+        <div style="flex:1;">
+            <div style="font-weight:800;font-size:15px;margin-bottom:6px;">Ready to commit?</div>
+            <div style="font-size:13px;color:var(--text-muted);line-height:1.6;">
+                Committing will create <strong>{{ variances | length }}</strong> adjustment transaction{{ 's' if variances | length != 1 }}
+                and update stock quantities for all products with variances.
+                Uncounted products will not be changed.
+                <strong>This cannot be undone.</strong>
+            </div>
+        </div>
+        <div style="flex-shrink:0;">
+            {% if variances | length > 0 %}
+            <form method="post" action="/stocktake/{{ st.id }}/commit"
+                  onsubmit="return confirm('Commit this stocktake? Stock quantities will be updated.')">
+                <button type="submit" class="btn btn-primary" style="white-space:nowrap;">
+                    ✓ Commit Stocktake
+                </button>
+            </form>
+            {% else %}
+            <form method="post" action="/stocktake/{{ st.id }}/commit">
+                <button type="submit" class="btn btn-primary">✓ Complete (No Changes)</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="card" style="padding:20px;border:1.5px solid var(--success);">
+    <span class="badge badge-success" style="font-size:14px;padding:8px 16px;">✓ Completed {{ st.completed_at.strftime('%d %B %Y at %H:%M') if st.completed_at }}</span>
+</div>
+{% endif %}
+
+</div>
+{% endblock %}

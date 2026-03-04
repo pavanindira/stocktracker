@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+{% block title %}{{ st.name }} — Count{% endblock %}
+
+{% block extra_head %}
+<style>
+.count-row { transition: background 0.2s; }
+.count-row.saved  { background: rgba(46,204,113,0.06); }
+.count-row.has-variance { background: rgba(245,166,35,0.06); }
+.count-row.negative-variance { background: rgba(231,76,60,0.06); }
+
+.count-input {
+    width: 90px;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 15px;
+    padding: 6px 10px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface2);
+    color: var(--text);
+    transition: border-color 0.15s;
+}
+.count-input:focus { border-color: var(--accent); outline: none; }
+.count-input.variance-pos { border-color: var(--success); }
+.count-input.variance-neg { border-color: var(--danger); }
+
+.variance-chip {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 12px;
+    min-width: 48px;
+    text-align: center;
+    display: inline-block;
+}
+
+.progress-sticky {
+    position: sticky;
+    top: 0;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 0;
+    z-index: 40;
+    margin-bottom: 16px;
+}
+.tab-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.tab-filter {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.tab-filter.active { background: var(--accent); color: #000; border-color: var(--accent); }
+.tab-filter:hover:not(.active) { border-color: var(--text-muted); color: var(--text); }
+
+#save-status {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-left: 12px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>{{ st.name }}</h2>
+        <div class="subtitle">// PHYSICAL COUNT · ENTER QUANTITIES BELOW</div>
+    </div>
+    <div style="display:flex;gap:10px;">
+        <a href="/stocktake/{{ st.id }}/review" class="btn btn-primary">Review &amp; Commit →</a>
+        <a href="/stocktake" class="btn btn-secondary">← Stocktakes</a>
+    </div>
+</div>
+
+<div class="content">
+
+<!-- Sticky progress bar -->
+<div class="progress-sticky">
+    <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:200px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                <span style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted);">PROGRESS</span>
+                <span id="progress-text" style="font-family:var(--font-mono);font-size:12px;font-weight:700;">
+                    {{ counted }}/{{ total }}
+                </span>
+            </div>
+            <div style="background:var(--surface2);border-radius:6px;height:8px;">
+                <div id="progress-bar" style="background:var(--accent);width:{{ (counted/total*100)|int if total else 0 }}%;height:8px;border-radius:6px;transition:width 0.4s;"></div>
+            </div>
+        </div>
+        <div style="font-family:var(--font-mono);font-size:12px;">
+            <span id="variance-count" style="color:{% if variances > 0 %}var(--danger){% else %}var(--success){% endif %};">
+                {{ variances }} variance{{ 's' if variances != 1 }}
+            </span>
+        </div>
+        <span id="save-status"></span>
+    </div>
+</div>
+
+<!-- Search + filter -->
+<form method="get" action="/stocktake/{{ st.id }}" id="filter-form" style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+    <input type="text" name="search" value="{{ search }}" placeholder="Search product or SKU…"
+           style="flex:1;min-width:200px;" onchange="this.form.submit()">
+    <input type="hidden" name="filter" value="{{ filter }}">
+</form>
+
+<div class="tab-filters">
+    {% for f, label in [('all','All'), ('uncounted','Uncounted'), ('variance','Has Variance'), ('ok','Matched')] %}
+    <a href="/stocktake/{{ st.id }}?filter={{ f }}&search={{ search }}"
+       class="tab-filter {% if filter == f %}active{% endif %}">{{ label }}</a>
+    {% endfor %}
+</div>
+
+<!-- Count table -->
+<div class="card" style="padding:0;">
+    {% if items %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>SKU</th>
+                    <th>Category</th>
+                    <th style="text-align:center;">System Qty</th>
+                    <th style="text-align:center;">Counted Qty</th>
+                    <th style="text-align:center;">Variance</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for item in items %}
+            <tr id="row-{{ item.id }}"
+                class="count-row {% if item.counted_quantity is not none %}{% if item.variance > 0 %}has-variance{% elif item.variance < 0 %}negative-variance{% else %}saved{% endif %}{% endif %}">
+                <td style="font-weight:700;">{{ item.product.name }}</td>
+                <td class="mono" style="font-size:11px;color:var(--text-muted);">{{ item.product.sku or '—' }}</td>
+                <td style="font-size:12px;">
+                    {% if item.product.category_obj %}
+                    <span class="badge" style="background:{{ item.product.category_obj.color }}22;color:{{ item.product.category_obj.color }};border:1px solid {{ item.product.category_obj.color }}44;">
+                        {{ item.product.category_obj.name }}
+                    </span>
+                    {% else %}—{% endif %}
+                </td>
+                <td style="text-align:center;">
+                    <span class="mono" style="font-weight:700;">
+                        {{ item.system_quantity | int if item.system_quantity == item.system_quantity | int else "%.2f"|format(item.system_quantity) }}
+                        <span style="color:var(--text-muted);font-size:11px;">{{ item.product.unit }}</span>
+                    </span>
+                </td>
+                <td style="text-align:center;">
+                    <input type="number" step="0.01" min="0"
+                           class="count-input {% if item.counted_quantity is not none %}{% if item.variance > 0 %}variance-pos{% elif item.variance < 0 %}variance-neg{% endif %}{% endif %}"
+                           id="input-{{ item.id }}"
+                           value="{{ item.counted_quantity if item.counted_quantity is not none else '' }}"
+                           placeholder="—"
+                           data-item-id="{{ item.id }}"
+                           data-system="{{ item.system_quantity }}"
+                           onchange="saveCount({{ item.id }}, this.value)"
+                           onkeydown="handleKey(event, {{ item.id }})">
+                </td>
+                <td style="text-align:center;" id="var-{{ item.id }}">
+                    {% if item.counted_quantity is not none %}
+                    {% set v = item.variance %}
+                    <span class="variance-chip"
+                          style="background:{% if v > 0 %}rgba(46,204,113,0.15){% elif v < 0 %}rgba(231,76,60,0.15){% else %}rgba(46,204,113,0.1){% endif %};color:{% if v > 0 %}var(--success){% elif v < 0 %}var(--danger){% else %}var(--success){% endif %};">
+                        {% if v > 0 %}+{% endif %}{{ v | int if v == v | int else "%.1f"|format(v) }}
+                    </span>
+                    {% else %}
+                    <span style="color:var(--text-muted);font-size:12px;">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <input type="text" placeholder="Note…"
+                           style="font-size:12px;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);width:120px;"
+                           id="notes-{{ item.id }}"
+                           value="{{ item.notes or '' }}"
+                           onblur="saveNotes({{ item.id }}, this.value)">
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state" style="padding:32px;">
+        <p>No products match this filter.</p>
+    </div>
+    {% endif %}
+</div>
+
+<div style="margin-top:20px;display:flex;justify-content:flex-end;">
+    <a href="/stocktake/{{ st.id }}/review" class="btn btn-primary">Review Variances &amp; Commit →</a>
+</div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const STOCKTAKE_ID = {{ st.id }};
+let saveTimer = null;
+let totalItems = {{ total }};
+
+async function saveCount(itemId, value, notes) {
+    const input   = document.getElementById('input-' + itemId);
+    const notesEl = document.getElementById('notes-' + itemId);
+    const row     = document.getElementById('row-' + itemId);
+    const varCell = document.getElementById('var-' + itemId);
+
+    if (notes === undefined) notes = notesEl ? notesEl.value : '';
+
+    const status = document.getElementById('save-status');
+    status.textContent = 'Saving…';
+
+    try {
+        const resp = await fetch(
+            `/stocktake/${STOCKTAKE_ID}/count/${itemId}`,
+            {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    counted_quantity: value === '' ? null : parseFloat(value),
+                    notes: notes,
+                }),
+            }
+        );
+        const data = await resp.json();
+        if (!resp.ok) { status.textContent = '⚠ Error'; return; }
+
+        // Update variance chip
+        const v = data.variance;
+        let color, bg;
+        if (v > 0)       { color = 'var(--success)'; bg = 'rgba(46,204,113,0.15)'; }
+        else if (v < 0)  { color = 'var(--danger)';  bg = 'rgba(231,76,60,0.15)'; }
+        else             { color = 'var(--success)';  bg = 'rgba(46,204,113,0.1)'; }
+
+        const vStr = (v >= 0 ? '+' : '') + (Number.isInteger(v) ? v : v.toFixed(1));
+        varCell.innerHTML = data.counted_quantity !== null
+            ? `<span class="variance-chip" style="background:${bg};color:${color};">${vStr}</span>`
+            : `<span style="color:var(--text-muted);font-size:12px;">—</span>`;
+
+        // Update row class
+        row.className = 'count-row';
+        if (data.counted_quantity !== null) {
+            if (v > 0) row.classList.add('has-variance');
+            else if (v < 0) row.classList.add('negative-variance');
+            else row.classList.add('saved');
+        }
+
+        // Update input border
+        input.className = 'count-input';
+        if (data.counted_quantity !== null) {
+            if (v > 0) input.classList.add('variance-pos');
+            else if (v < 0) input.classList.add('variance-neg');
+        }
+
+        // Update progress
+        const pct = Math.round(data.counted_total / data.total * 100);
+        document.getElementById('progress-bar').style.width = pct + '%';
+        document.getElementById('progress-text').textContent =
+            data.counted_total + '/' + data.total;
+        const vc = document.getElementById('variance-count');
+        vc.textContent = data.variance_count + ' variance' + (data.variance_count !== 1 ? 's' : '');
+        vc.style.color = data.variance_count > 0 ? 'var(--danger)' : 'var(--success)';
+
+        status.textContent = '✓ Saved';
+        setTimeout(() => status.textContent = '', 1500);
+    } catch(e) {
+        status.textContent = '⚠ Save failed';
+    }
+}
+
+function saveNotes(itemId, notes) {
+    const input = document.getElementById('input-' + itemId);
+    if (input.value !== '') {
+        saveCount(itemId, input.value, notes);
+    }
+}
+
+// Tab key moves to next count input
+function handleKey(e, itemId) {
+    if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        const inputs = Array.from(document.querySelectorAll('.count-input'));
+        const idx    = inputs.indexOf(document.getElementById('input-' + itemId));
+        saveCount(itemId, e.target.value);
+        if (idx < inputs.length - 1) {
+            inputs[idx + 1].focus();
+            inputs[idx + 1].select();
+        }
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}Expiry Report — StockTracker{% endblock %}
+
+{% block extra_head %}
+<style>
+.expiry-section { margin-bottom: 32px; }
+.batch-row-expired { background: rgba(231,76,60,0.04); }
+.batch-row-soon    { background: rgba(245,166,35,0.04); }
+.days-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Expiry Report</h2>
+        <div class="subtitle">// FEFO — FIRST EXPIRY FIRST OUT · WARN WINDOW {{ warn_days }} DAYS</div>
+    </div>
+    <a href="/reports" class="btn btn-secondary">← Reports</a>
+</div>
+
+<div class="content">
+
+{% set total_expired = expired | length %}
+{% set total_soon    = expiring_soon | length %}
+
+<div class="stats-grid" style="margin-bottom: 28px;">
+    <div class="stat-card danger">
+        <div class="stat-label">Expired Products</div>
+        <div class="stat-value" style="color: {% if total_expired > 0 %}var(--danger){% else %}var(--success){% endif %}">
+            {{ total_expired }}
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Expiring Within {{ warn_days }}d</div>
+        <div class="stat-value" style="color: {% if total_soon > 0 %}var(--accent){% else %}var(--success){% endif %}">
+            {{ total_soon }}
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Total Affected Batches</div>
+        <div class="stat-value">
+            {% set total_batches = namespace(n=0) %}
+            {% for w in expired + expiring_soon %}{% set total_batches.n = total_batches.n + w.batches|length %}{% endfor %}
+            {{ total_batches.n }}
+        </div>
+    </div>
+    <div class="stat-card success">
+        <div class="stat-label">Report Date</div>
+        <div class="stat-value large">{{ today.strftime('%d %b') }}</div>
+    </div>
+</div>
+
+{% if total_expired == 0 and total_soon == 0 %}
+<div class="empty-state card">
+    <div class="empty-icon">✅</div>
+    <p style="font-weight:700;font-size:16px;margin-bottom:8px;">All stock is within date</p>
+    <p>No expired or expiring-soon batches found.</p>
+</div>
+{% endif %}
+
+{% if expired %}
+<div class="expiry-section">
+    <div class="section-header">
+        <span class="section-title" style="color:var(--danger);">⚠ Expired Stock</span>
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--danger);">{{ total_expired }} product{{ 's' if total_expired != 1 }}</span>
+    </div>
+    <div class="card" style="padding:0;">
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>Lot / Batch</th>
+                        <th>Qty</th>
+                        <th>Expiry Date</th>
+                        <th>Days Overdue</th>
+                        <th>Category</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for w in expired %}
+                    {% for b in w.batches %}
+                    <tr class="batch-row-expired">
+                        <td style="font-weight:700;">{{ w.product.name }}</td>
+                        <td class="mono" style="font-size:12px;color:var(--text-muted);">{{ b.lot_number or '—' }}</td>
+                        <td class="mono">{{ b.quantity | int if b.quantity == b.quantity | int else "%.2f"|format(b.quantity) }} {{ w.product.unit }}</td>
+                        <td class="mono" style="color:var(--danger);font-weight:700;">
+                            {{ b.expiry_date.strftime('%d %b %Y') if b.expiry_date else '—' }}
+                        </td>
+                        <td>
+                            {% if b.days_until_expiry is not none %}
+                            <span class="days-pill" style="background:rgba(231,76,60,0.15);color:var(--danger);">
+                                {{ (b.days_until_expiry * -1) }} days ago
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if w.product.category_obj %}
+                            <span class="badge" style="background:{{ w.product.category_obj.color }}22;color:{{ w.product.category_obj.color }};border:1px solid {{ w.product.category_obj.color }}44;">
+                                {{ w.product.category_obj.name }}
+                            </span>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td>
+                            <a href="/products/{{ w.product.id }}/edit" class="btn btn-secondary btn-sm">Edit Product</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if expiring_soon %}
+<div class="expiry-section">
+    <div class="section-header">
+        <span class="section-title" style="color:var(--accent);">⏰ Expiring Within {{ warn_days }} Days</span>
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--accent);">{{ total_soon }} product{{ 's' if total_soon != 1 }}</span>
+    </div>
+    <div class="card" style="padding:0;">
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>Lot / Batch</th>
+                        <th>Qty</th>
+                        <th>Expiry Date</th>
+                        <th>Days Left</th>
+                        <th>Category</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for w in expiring_soon %}
+                    {% for b in w.batches %}
+                    <tr class="batch-row-soon">
+                        <td style="font-weight:700;">{{ w.product.name }}</td>
+                        <td class="mono" style="font-size:12px;color:var(--text-muted);">{{ b.lot_number or '—' }}</td>
+                        <td class="mono">{{ b.quantity | int if b.quantity == b.quantity | int else "%.2f"|format(b.quantity) }} {{ w.product.unit }}</td>
+                        <td class="mono" style="color:var(--accent);font-weight:700;">
+                            {{ b.expiry_date.strftime('%d %b %Y') if b.expiry_date else '—' }}
+                        </td>
+                        <td>
+                            {% if b.days_until_expiry is not none %}
+                            {% if b.days_until_expiry <= 7 %}
+                            <span class="days-pill" style="background:rgba(231,76,60,0.15);color:var(--danger);">{{ b.days_until_expiry }}d</span>
+                            {% else %}
+                            <span class="days-pill" style="background:rgba(245,166,35,0.15);color:var(--accent);">{{ b.days_until_expiry }}d</span>
+                            {% endif %}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if w.product.category_obj %}
+                            <span class="badge" style="background:{{ w.product.category_obj.color }}22;color:{{ w.product.category_obj.color }};border:1px solid {{ w.product.category_obj.color }}44;">
+                                {{ w.product.category_obj.name }}
+                            </span>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td>
+                            <a href="/products/{{ w.product.id }}/edit" class="btn btn-secondary btn-sm">Edit Product</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+</div>
+{% endblock %}

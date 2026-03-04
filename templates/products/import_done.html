@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Import Complete — StockTracker{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Import Complete</h2>
+        <div class="subtitle">// PRODUCTS HAVE BEEN SAVED</div>
+    </div>
+</div>
+<div class="content">
+    <div class="card" style="max-width: 500px; text-align: center; padding: 40px;">
+        <div style="font-size: 48px; margin-bottom: 16px;">✓</div>
+        <h3 style="font-size: 22px; font-weight: 800; margin-bottom: 24px;">
+            Import Finished
+        </h3>
+        <div class="stats-grid" style="grid-template-columns: 1fr 1fr 1fr; margin-bottom: 28px;">
+            <div class="stat-card success">
+                <div class="stat-label">Created</div>
+                <div class="stat-value">{{ created }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Updated</div>
+                <div class="stat-value">{{ updated }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Skipped</div>
+                <div class="stat-value" style="color:var(--text-muted);">{{ skipped }}</div>
+            </div>
+        </div>
+        <div style="display: flex; gap: 12px; justify-content: center;">
+            <a href="/products" class="btn btn-primary">View Products →</a>
+            <a href="/products/import" class="btn btn-secondary">Import Another File</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

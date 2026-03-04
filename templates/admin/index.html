@@ -1,0 +1,114 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Admin Dashboard — StockTracker{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Shop Management</h2>
+        <div class="subtitle">// SYSTEM ADMIN · {{ total_shops }} REGISTERED SHOPS</div>
+    </div>
+    <a href="/admin/shops/new" class="btn btn-primary">+ Add New Shop</a>
+</div>
+<div class="content">
+
+    {% if request.query_params.get('created') %}
+    <div class="alert alert-success">✓ Shop created successfully. The shop can now log in with the provided credentials.</div>
+    {% endif %}
+
+    <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr);">
+        <div class="stat-card">
+            <div class="stat-label">Total Shops</div>
+            <div class="stat-value">{{ total_shops }}</div>
+        </div>
+        <div class="stat-card success">
+            <div class="stat-label">Active Shops</div>
+            <div class="stat-value">{{ active_shops }}</div>
+        </div>
+        <div class="stat-card danger">
+            <div class="stat-label">Inactive Shops</div>
+            <div class="stat-value">{{ total_shops - active_shops }}</div>
+        </div>
+    </div>
+
+    <div class="card" style="padding: 0;">
+        <div style="padding: 18px 20px; border-bottom: 1px solid var(--border);">
+            <div class="section-title">All Shops</div>
+        </div>
+        {% if shop_stats %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Shop</th>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Products</th>
+                        <th>Transactions</th>
+                        <th>Low Stock</th>
+                        <th>Registered</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in shop_stats %}
+                    <tr>
+                        <td>
+                            <div style="font-weight: 700;">{{ s.shop.name }}</div>
+                        </td>
+                        <td class="mono">{{ s.shop.username }}</td>
+                        <td style="color: var(--text-muted); font-size: 13px;">{{ s.shop.email or '—' }}</td>
+                        <td class="mono">{{ s.product_count }}</td>
+                        <td class="mono">{{ s.txn_count }}</td>
+                        <td class="mono" style="color: {% if s.low_stock > 0 %}var(--danger){% else %}var(--text-muted){% endif %}">
+                            {{ s.low_stock }}
+                        </td>
+                        <td class="mono" style="font-size: 11px; color: var(--text-muted);">
+                            {{ s.shop.created_at.strftime('%b %d, %Y') }}
+                        </td>
+                        <td>
+                            {% if s.shop.is_active %}
+                                <span class="badge badge-success">Active</span>
+                            {% else %}
+                                <span class="badge badge-danger">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                                <a href="/admin/shops/{{ s.shop.id }}/edit" class="btn btn-secondary btn-sm">Edit</a>
+                                <a href="/admin/shops/{{ s.shop.id }}/reset-password" class="btn btn-warning btn-sm">⚿ Pwd</a>
+                                <form method="post" action="/admin/shops/{{ s.shop.id }}/toggle-active"
+                                      onsubmit="return confirm('{% if s.shop.is_active %}Deactivate{% else %}Activate{% endif %} {{ s.shop.name }}?')">
+                                    {% if s.shop.is_active %}
+                                        <button type="submit" class="btn btn-danger btn-sm">Deactivate</button>
+                                    {% else %}
+                                        <button type="submit" class="btn btn-success btn-sm">Activate</button>
+                                    {% endif %}
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div style="font-size: 36px; margin-bottom: 12px;">◻</div>
+            <p style="font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 8px;">No shops registered yet</p>
+            <p>Create your first shop to get started.</p>
+            <br>
+            <a href="/admin/shops/new" class="btn btn-primary">+ Add New Shop</a>
+        </div>
+        {% endif %}
+    </div>
+
+    <div style="margin-top: 20px; padding: 14px 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px;">
+        <div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); letter-spacing: 1px; margin-bottom: 6px;">ℹ ADMIN NOTES</div>
+        <div style="font-size: 13px; color: var(--text-muted); line-height: 1.6;">
+            Shops you create will receive their username and password from you directly.
+            Use <strong style="color: var(--text)">⚿ Pwd</strong> to reset a shop's password at any time.
+            Deactivated shops cannot log in until reactivated.
+        </div>
+    </div>
+</div>
+{% endblock %}

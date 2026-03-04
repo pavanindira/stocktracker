@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+{% block title %}Import Products — StockTracker{% endblock %}
+
+{% block extra_head %}
+<style>
+.drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 48px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    background: var(--surface);
+}
+.drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(245,166,35,0.04);
+}
+.drop-zone input[type="file"] { display: none; }
+.drop-icon { font-size: 36px; margin-bottom: 12px; }
+
+.preview-table thead th { white-space: nowrap; }
+.row-create  td:first-child { border-left: 3px solid var(--success); }
+.row-update  td:first-child { border-left: 3px solid var(--accent); }
+.row-skip    td:first-child { border-left: 3px solid var(--text-muted); }
+.row-error   td:first-child { border-left: 3px solid var(--danger); }
+.row-skip    { opacity: 0.55; }
+.row-error   { background: rgba(231,76,60,0.05); }
+
+.legend { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 16px; font-size: 13px; }
+.legend-item { display: flex; align-items: center; gap: 6px; }
+.legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Import Products</h2>
+        <div class="subtitle">// BULK CSV UPLOAD · MAX 2,000 ROWS</div>
+    </div>
+    <div style="display:flex;gap:10px;">
+        <a href="/products/import/template" class="btn btn-secondary">⬇ Download Template</a>
+        <a href="/products" class="btn btn-secondary">← Back to Products</a>
+    </div>
+</div>
+
+<div class="content">
+
+{% if error %}
+<div class="alert alert-danger">⚠ {{ error }}</div>
+{% endif %}
+
+{% if not preview %}
+<!-- ── Upload form ─────────────────────────────────────────────────────── -->
+<div class="grid-2" style="gap: 28px; align-items: start;">
+    <div>
+        <form method="post" action="/products/import/preview"
+              enctype="multipart/form-data" id="upload-form">
+
+            <div class="drop-zone" id="drop-zone"
+                 onclick="document.getElementById('csv-file').click()">
+                <input type="file" name="file" id="csv-file" accept=".csv"
+                       onchange="handleFile(this)">
+                <div class="drop-icon">📂</div>
+                <div style="font-weight: 700; font-size: 16px;">
+                    Drop your CSV here or click to browse
+                </div>
+                <div id="file-name" style="color: var(--text-muted); font-size: 13px; margin-top: 8px;">
+                    No file selected · .csv files only
+                </div>
+            </div>
+
+            <div class="card" style="margin-top: 20px; padding: 20px;">
+                <div class="card-title">OPTIONS</div>
+                <div class="form-group" style="margin-top: 8px;">
+                    <label>When a duplicate is found (same SKU or name)</label>
+                    <select name="on_duplicate">
+                        <option value="skip">Skip — keep existing product unchanged</option>
+                        <option value="update">Update — overwrite with CSV values</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <button type="submit" class="btn btn-primary" id="preview-btn" disabled>
+                    Preview Import →
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="card">
+        <div class="card-title">CSV FORMAT</div>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px; line-height: 1.7;">
+            Download the template above and fill it in. Column order doesn't matter.
+            Only <code>name</code> is required — all other columns are optional.
+        </p>
+        <table>
+            <thead>
+                <tr><th>Column</th><th>Required</th><th>Example</th></tr>
+            </thead>
+            <tbody>
+                {% for col, req, ex in [
+                    ('name',                '✓ Yes',  'Coca-Cola 500ml'),
+                    ('sku',                 'No',     '5449000000996'),
+                    ('category',            'No',     'Beverages'),
+                    ('description',         'No',     '500ml can'),
+                    ('unit',                'No',     'pcs'),
+                    ('cost_price',          'No',     '0.60'),
+                    ('selling_price',       'No',     '1.20'),
+                    ('stock_quantity',      'No',     '48'),
+                    ('low_stock_threshold', 'No',     '12'),
+                ] %}
+                <tr>
+                    <td class="mono" style="font-size:12px;">{{ col }}</td>
+                    <td>
+                        {% if req == '✓ Yes' %}
+                        <span class="badge badge-success">{{ req }}</span>
+                        {% else %}
+                        <span style="color:var(--text-muted);font-size:12px;">{{ req }}</span>
+                        {% endif %}
+                    </td>
+                    <td style="color:var(--text-muted);font-size:12px;">{{ ex }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div style="margin-top:16px;padding:12px;background:var(--surface2);border-radius:6px;font-size:12px;color:var(--text-muted);line-height:1.6;">
+            💡 <strong>New categories</strong> are created automatically if they don't exist yet.
+            Duplicates are matched by SKU first, then by name (case-insensitive).
+        </div>
+    </div>
+</div>
+
+{% else %}
+<!-- ── Preview table ──────────────────────────────────────────────────── -->
+{% set n_create  = preview | selectattr('status', 'eq', 'create')  | list | length %}
+{% set n_update  = preview | selectattr('status', 'eq', 'update')  | list | length %}
+{% set n_skip    = preview | selectattr('status', 'eq', 'skip')    | list | length %}
+{% set n_error   = preview | selectattr('status', 'eq', 'error')   | list | length %}
+{% set n_ok      = n_create + n_update %}
+
+<div class="stats-grid" style="margin-bottom: 24px;">
+    <div class="stat-card success">
+        <div class="stat-label">To Create</div>
+        <div class="stat-value">{{ n_create }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">To Update</div>
+        <div class="stat-value">{{ n_update }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Skipped</div>
+        <div class="stat-value" style="color: var(--text-muted);">{{ n_skip }}</div>
+    </div>
+    <div class="stat-card {% if n_error > 0 %}danger{% endif %}">
+        <div class="stat-label">Errors</div>
+        <div class="stat-value {% if n_error > 0 %}{% else %}{% endif %}">{{ n_error }}</div>
+    </div>
+</div>
+
+<div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--success)"></div> Will be created</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div> Will be updated</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--text-muted)"></div> Skipped (duplicate)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--danger)"></div> Error — will not import</div>
+</div>
+
+<div class="card" style="padding:0; margin-bottom: 24px;">
+    <div class="table-wrap preview-table">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th><th>Status</th><th>Name</th><th>SKU</th>
+                    <th>Category</th><th>Unit</th><th>Cost</th><th>Sell</th>
+                    <th>Stock</th><th>Note</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for r in preview %}
+            <tr class="row-{{ r.status }}">
+                <td class="mono" style="color:var(--text-muted);font-size:11px;">{{ r.row }}</td>
+                <td>
+                    {% if r.status == 'create' %}
+                        <span class="badge badge-success">+ Create</span>
+                    {% elif r.status == 'update' %}
+                        <span class="badge badge-warning">↑ Update</span>
+                    {% elif r.status == 'skip' %}
+                        <span class="badge badge-muted">— Skip</span>
+                    {% else %}
+                        <span class="badge badge-danger">✗ Error</span>
+                    {% endif %}
+                </td>
+                <td style="font-weight:600;">{{ r.name or '—' }}</td>
+                <td class="mono" style="font-size:11px;color:var(--text-muted);">{{ r.sku or '—' }}</td>
+                <td style="font-size:13px;">{{ r.category or '—' }}</td>
+                <td class="mono" style="font-size:12px;">{{ r.unit }}</td>
+                <td class="mono" style="font-size:12px;">${{ r.cost_price or '0' }}</td>
+                <td class="mono" style="font-size:12px;">${{ r.selling_price or '0' }}</td>
+                <td class="mono" style="font-size:12px;">{{ r.stock_quantity or '0' }}</td>
+                <td style="font-size:12px;color:{% if r.error %}var(--danger){% else %}var(--text-muted){% endif %};">
+                    {{ r.error or '' }}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div style="display:flex; gap: 14px; align-items: center;">
+    {% if n_ok > 0 and csv_data %}
+    <form method="post" action="/products/import/commit">
+        <input type="hidden" name="csv_data" value="{{ csv_data | tojson }}">
+        <input type="hidden" name="on_duplicate" value="{{ on_duplicate }}">
+        <button type="submit" class="btn btn-primary">
+            ✓ Confirm — Import {{ n_ok }} Product{{ 's' if n_ok != 1 else '' }}
+        </button>
+    </form>
+    {% endif %}
+    <a href="/products/import" class="btn btn-secondary">← Upload Different File</a>
+    {% if n_error > 0 %}
+    <span style="color:var(--danger);font-size:13px;">
+        {{ n_error }} row{{ 's' if n_error != 1 else '' }} with errors will be skipped.
+    </span>
+    {% endif %}
+</div>
+{% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('csv-file');
+
+if (dropZone) {
+    dropZone.addEventListener('dragover', e => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+    });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        const f = e.dataTransfer.files[0];
+        if (f) {
+            const dt = new DataTransfer();
+            dt.items.add(f);
+            fileInput.files = dt.files;
+            handleFile(fileInput);
+        }
+    });
+}
+
+function handleFile(input) {
+    const f = input.files[0];
+    if (!f) return;
+    document.getElementById('file-name').textContent = f.name + ' · ' +
+        (f.size > 1024 ? (f.size / 1024).toFixed(1) + ' KB' : f.size + ' B');
+    document.getElementById('preview-btn').disabled = false;
+}
+</script>
+{% endblock %}

@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}{% if category %}Edit Category{% else %}New Category{% endif %} — StockTracker{% endblock %}
+{% block extra_head %}
+<style>
+    .color-picker { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+    .color-swatch {
+        width: 32px; height: 32px; border-radius: 50%; cursor: pointer;
+        border: 3px solid transparent; transition: transform 0.15s, border-color 0.15s;
+        flex-shrink: 0;
+    }
+    .color-swatch:hover { transform: scale(1.15); }
+    .color-swatch.selected { border-color: var(--text); transform: scale(1.15); }
+    .color-preview {
+        display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+        background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+        margin-bottom: 8px;
+    }
+    .color-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+    #custom-color { width: 48px; height: 32px; padding: 2px; border-radius: 4px; cursor: pointer; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>{% if category %}Edit Category{% else %}New Category{% endif %}</h2>
+        <div class="subtitle">// {% if category %}EDITING {{ category.name | upper }}{% else %}ADD CATEGORY{% endif %}</div>
+    </div>
+    <a href="/categories" class="btn btn-secondary">← Back</a>
+</div>
+<div class="content">
+    <div class="card" style="max-width: 560px;">
+        {% if error %}
+        <div class="alert alert-danger">⚠ {{ error }}</div>
+        {% endif %}
+
+        <form method="post" action="{% if category %}/categories/{{ category.id }}/edit{% else %}/categories/new{% endif %}" id="cat-form">
+            <input type="hidden" name="color" id="color-value" value="{{ category.color if category else colors[0] }}">
+
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label>Category Name *</label>
+                <input type="text" name="name" value="{{ category.name if category else '' }}" required placeholder="e.g. Electronics, Beverages, Stationery" autofocus>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label>Description (optional)</label>
+                <textarea name="description" placeholder="Brief description of what belongs in this category…">{{ category.description if category and category.description else '' }}</textarea>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 24px;">
+                <label>Colour</label>
+                <div class="color-preview">
+                    <div class="color-dot" id="preview-dot" style="background: {{ category.color if category else colors[0] }};"></div>
+                    <span id="preview-label" style="font-family: var(--font-mono); font-size: 12px;">{{ category.color if category else colors[0] }}</span>
+                </div>
+                <div class="color-picker" id="color-picker">
+                    {% for c in colors %}
+                    <div class="color-swatch {% if (category and category.color == c) or (not category and loop.first) %}selected{% endif %}"
+                         style="background: {{ c }};"
+                         data-color="{{ c }}"
+                         title="{{ c }}"
+                         onclick="selectColor('{{ c }}')"></div>
+                    {% endfor %}
+                    <input type="color" id="custom-color"
+                           value="{{ category.color if category else colors[0] }}"
+                           title="Custom colour"
+                           oninput="selectColor(this.value)">
+                </div>
+                <div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); margin-top: 6px;">
+                    Pick a preset or use the colour picker for a custom shade.
+                </div>
+            </div>
+
+            <hr>
+            <div style="display: flex; gap: 12px;">
+                <button type="submit" class="btn btn-primary">
+                    {% if category %}Save Changes{% else %}Create Category{% endif %}
+                </button>
+                <a href="/categories" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+function selectColor(hex) {
+    // Normalise short hex
+    if (hex.length === 4) {
+        hex = '#' + hex[1]+hex[1]+hex[2]+hex[2]+hex[3]+hex[3];
+    }
+    document.getElementById('color-value').value = hex;
+    document.getElementById('preview-dot').style.background = hex;
+    document.getElementById('preview-label').textContent = hex;
+    document.getElementById('custom-color').value = hex;
+
+    // Update swatch selection
+    document.querySelectorAll('.color-swatch').forEach(s => {
+        s.classList.toggle('selected', s.dataset.color === hex);
+    });
+}
+</script>
+{% endblock %}

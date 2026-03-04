@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}New Stocktake — StockTracker{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div><h2>New Stocktake</h2><div class="subtitle">// PHYSICAL COUNT SESSION</div></div>
+    <a href="/stocktake" class="btn btn-secondary">← Back</a>
+</div>
+<div class="content"><div style="max-width:560px;">
+<div class="card">
+    <form method="post" action="/stocktake/new">
+        <div class="form-group">
+            <label>Stocktake Name <span style="color:var(--danger)">*</span></label>
+            <input type="text" name="name" required
+                   placeholder="e.g. Monthly Count — March 2026"
+                   value="{{ now.strftime('Monthly Count — %B %Y') if now else '' }}">
+        </div>
+        <div class="form-group">
+            <label>Category (optional)</label>
+            <select name="category_id">
+                <option value="">All Categories ({{ product_count }} products)</option>
+                {% for cat in categories %}
+                <option value="{{ cat.id }}">{{ cat.name }} ({{ cat.product_count }} products)</option>
+                {% endfor %}
+            </select>
+            <small style="color:var(--text-muted);font-size:11px;">Count only products in one category, or leave blank to count everything.</small>
+        </div>
+        <div class="form-group">
+            <label>Notes</label>
+            <textarea name="notes" rows="2" placeholder="Optional notes about this count…"></textarea>
+        </div>
+        <div style="padding:14px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);margin-bottom:20px;font-size:13px;color:var(--text-muted);line-height:1.7;">
+            📋 Creating a stocktake will take a <strong>snapshot</strong> of all current system quantities.
+            You then enter the physical count for each product. Any discrepancies are shown as variances.
+            When you commit, adjustment transactions are created automatically.
+        </div>
+        <div style="display:flex;gap:12px;">
+            <button type="submit" class="btn btn-primary">Create &amp; Start Counting →</button>
+            <a href="/stocktake" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+</div></div>
+{% endblock %}
+{% block extra_js %}
+<script>
+// Auto-set name to current month if empty
+const nameInput = document.querySelector('input[name="name"]');
+if (!nameInput.value) {
+    const now = new Date();
+    nameInput.value = 'Monthly Count — ' + now.toLocaleString('default',{month:'long'}) + ' ' + now.getFullYear();
+}
+</script>
+{% endblock %}
