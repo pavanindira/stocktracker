@@ -11,13 +11,19 @@ from seed import seed_admin
 
 load_dotenv()
 
-models.Base.metadata.create_all(bind=engine)
+# Schema is managed by Alembic — run: alembic upgrade head
+# models.Base.metadata.create_all(bind=engine)  # kept for reference only
 seed_admin()
 
 app = FastAPI(title="StockTracker", description="Multi-shop stock management system")
 
 SECRET_KEY = os.getenv("SECRET_KEY", "change-this-secret-key-in-production")
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+
+@app.get("/health", include_in_schema=False)
+async def health():
+    """Docker / load-balancer health check endpoint."""
+    return {"status": "ok"}
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

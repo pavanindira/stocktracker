@@ -1,0 +1,72 @@
+services:
+
+  # ── PostgreSQL database ──────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-stocktracker}
+      POSTGRES_USER:     ${POSTGRES_USER:-stocktracker}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-stocktracker} -d ${POSTGRES_DB:-stocktracker}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - internal
+
+  # ── FastAPI application ──────────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-stocktracker}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-stocktracker}
+      WORKERS: ${WORKERS:-2}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      # Static files shared with Nginx
+      - static_files:/app/static
+    networks:
+      - internal
+    # Do NOT expose 8000 publicly — Nginx is the only entry point
+    expose:
+      - "8000"
+
+  # ── Nginx reverse proxy ──────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      # Uncomment for HTTPS:
+      # - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - static_files:/app/static:ro
+      # Uncomment for Let's Encrypt certs:
+      # - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - app
+    networks:
+      - internal
+      - external
+
+volumes:
+  postgres_data:   # persists the database across container restarts
+  static_files:    # shared between app (write) and nginx (read)
+
+networks:
+  internal:
+    # App ↔ DB ↔ Nginx: no public access
+  external:
+    # Nginx public-facing

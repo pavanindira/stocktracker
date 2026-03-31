@@ -1,0 +1,60 @@
+# .dockerignore
+# Keeps the Docker build context small and fast.
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Environment secrets — never bake into the image
+.env
+*.env
+
+# Version control
+.git/
+.gitignore
+.gitkeep
+
+# Tests
+tests/
+test_*.py
+*_test.py
+pytest.ini
+.coverage
+htmlcov/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Mobile app — built separately, not part of the backend image
+mobile/
+mobile_app/
+
+# Docs — not needed at runtime
+README.md
+docs/
+
+# Legacy SQL migration files — Alembic owns migrations now
+migrate_*.sql
+
+# Node (if any tooling was added)
+node_modules/
+npm-debug.log

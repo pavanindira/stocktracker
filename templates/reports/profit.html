@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% block title %}Profit & Loss — StockTracker{% endblock %}
+
+{% block extra_head %}
+<style>
+.pl-bar {
+    height: 6px; border-radius: 3px;
+    background: var(--accent); display: inline-block;
+    transition: width 0.4s;
+}
+.margin-pill {
+    display: inline-block; padding: 2px 8px; border-radius: 12px;
+    font-family: var(--font-mono); font-size: 11px; font-weight: 800;
+}
+.period-btn {
+    padding: 6px 14px; border-radius: 20px; font-size: 12px;
+    font-family: var(--font-mono); font-weight: 700;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text-muted); text-decoration: none; cursor: pointer;
+    transition: all 0.15s;
+}
+.period-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+.period-btn:hover:not(.active) { border-color: var(--text-muted); color: var(--text); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Profit &amp; Loss</h2>
+        <div class="subtitle">// GROSS PROFIT · {{ date_from }} → {{ date_to }}</div>
+    </div>
+    <a href="/reports" class="btn btn-secondary">← Reports</a>
+</div>
+
+<div class="content">
+
+<!-- Period selector -->
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px;align-items:center;">
+    {% for p, label in [('today','Today'),('week','This Week'),('month','This Month'),('last_month','Last Month')] %}
+    <a href="/reports/profit?period={{ p }}"
+       class="period-btn {% if period == p %}active{% endif %}">{{ label }}</a>
+    {% endfor %}
+    <form method="get" action="/reports/profit" style="display:flex;gap:8px;align-items:center;margin-left:8px;">
+        <input type="date" name="date_from" value="{{ date_from }}"
+               style="font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);">
+        <span style="color:var(--text-muted);font-size:12px;">to</span>
+        <input type="date" name="date_to" value="{{ date_to }}"
+               style="font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);">
+        <button type="submit" class="btn btn-secondary" style="padding:6px 14px;font-size:12px;">Apply</button>
+    </form>
+</div>
+
+<!-- KPI cards -->
+<div class="stats-grid" style="margin-bottom:28px;">
+    <div class="stat-card">
+        <div class="stat-label">Revenue</div>
+        <div class="stat-value large">${{ "%.2f"|format(total_revenue) }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">COGS</div>
+        <div class="stat-value large" style="color:var(--danger);">${{ "%.2f"|format(total_cost) }}</div>
+    </div>
+    <div class="stat-card {% if total_profit >= 0 %}success{% else %}danger{% endif %}">
+        <div class="stat-label">Gross Profit</div>
+        <div class="stat-value large" style="color:{% if total_profit >= 0 %}var(--success){% else %}var(--danger){% endif %};">
+            ${{ "%.2f"|format(total_profit) }}
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Gross Margin</div>
+        <div class="stat-value large" style="color:{% if total_margin >= 30 %}var(--success){% elif total_margin >= 10 %}var(--accent){% else %}var(--danger){% endif %};">
+            {{ total_margin }}%
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Total Discounts</div>
+        <div class="stat-value" style="color:{% if total_discounts > 0 %}var(--accent){% else %}var(--text-muted){% endif %};">
+            ${{ "%.2f"|format(total_discounts) }}
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Transactions</div>
+        <div class="stat-value">{{ total_transactions }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Units Sold</div>
+        <div class="stat-value">{{ total_units_sold }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Avg Transaction</div>
+        <div class="stat-value">
+            {% if total_transactions > 0 %}
+            ${{ "%.2f"|format(total_revenue / total_transactions) }}
+            {% else %}—{% endif %}
+        </div>
+    </div>
+</div>
+
+{% if products %}
+
+<!-- Category breakdown -->
+{% if categories %}
+<div class="card" style="padding:0;margin-bottom:24px;">
+    <div style="padding:16px 20px 0;"><div class="card-title">BY CATEGORY</div></div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr><th>Category</th><th>Revenue</th><th>COGS</th><th>Gross Profit</th><th>Margin</th><th>Share of Revenue</th></tr>
+            </thead>
+            <tbody>
+            {% for cat in categories %}
+            <tr>
+                <td style="font-weight:700;">{{ cat.name }}</td>
+                <td class="mono">${{ "%.2f"|format(cat.revenue) }}</td>
+                <td class="mono" style="color:var(--danger);">${{ "%.2f"|format(cat.cost) }}</td>
+                <td class="mono" style="font-weight:700;color:{% if cat.profit >= 0 %}var(--success){% else %}var(--danger){% endif %};">
+                    ${{ "%.2f"|format(cat.profit) }}
+                </td>
+                <td>
+                    <span class="margin-pill" style="background:{% if cat.margin >= 30 %}rgba(46,204,113,0.15){% elif cat.margin >= 10 %}rgba(124,106,247,0.15){% else %}rgba(231,76,60,0.15){% endif %};color:{% if cat.margin >= 30 %}var(--success){% elif cat.margin >= 10 %}var(--accent){% else %}var(--danger){% endif %};">
+                        {{ cat.margin }}%
+                    </span>
+                </td>
+                <td>
+                    {% if total_revenue > 0 %}
+                    {% set share = (cat.revenue / total_revenue * 100) | round(1) %}
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <div style="flex:1;background:var(--surface2);border-radius:3px;height:6px;min-width:80px;">
+                            <div class="pl-bar" style="width:{{ share }}%;"></div>
+                        </div>
+                        <span class="mono" style="font-size:11px;color:var(--text-muted);">{{ share }}%</span>
+                    </div>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Product breakdown -->
+<div class="card" style="padding:0;">
+    <div style="padding:16px 20px 0;display:flex;justify-content:space-between;align-items:center;">
+        <div class="card-title">BY PRODUCT</div>
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);">
+            {{ products | length }} product{{ 's' if products | length != 1 }} · sorted by profit
+        </span>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Category</th>
+                    <th>Qty Sold</th>
+                    <th>Revenue</th>
+                    <th>COGS</th>
+                    <th>Gross Profit</th>
+                    <th>Margin</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for p in products %}
+            <tr>
+                <td>
+                    <div style="font-weight:700;">{{ p.name }}</div>
+                    {% if p.sku %}<div class="mono" style="font-size:10px;color:var(--text-muted);">{{ p.sku }}</div>{% endif %}
+                </td>
+                <td style="font-size:12px;color:var(--text-muted);">{{ p.category or '—' }}</td>
+                <td class="mono" style="font-size:12px;">{{ p.qty_sold | int if p.qty_sold == p.qty_sold | int else "%.1f"|format(p.qty_sold) }} {{ p.unit }}</td>
+                <td class="mono">${{ "%.2f"|format(p.revenue) }}</td>
+                <td class="mono" style="color:var(--danger);">${{ "%.2f"|format(p.cost) }}</td>
+                <td class="mono" style="font-weight:700;color:{% if p.profit >= 0 %}var(--success){% else %}var(--danger){% endif %};">
+                    {% if p.profit >= 0 %}+{% endif %}${{ "%.2f"|format(p.profit) }}
+                </td>
+                <td>
+                    <span class="margin-pill" style="background:{% if p.margin >= 30 %}rgba(46,204,113,0.15){% elif p.margin >= 10 %}rgba(124,106,247,0.15){% else %}rgba(231,76,60,0.15){% endif %};color:{% if p.margin >= 30 %}var(--success){% elif p.margin >= 10 %}var(--accent){% else %}var(--danger){% endif %};">
+                        {{ p.margin }}%
+                    </span>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr style="background:var(--surface2);font-weight:800;">
+                    <td colspan="3" style="font-family:var(--font-mono);font-size:11px;letter-spacing:2px;">TOTAL</td>
+                    <td class="mono">${{ "%.2f"|format(total_revenue) }}</td>
+                    <td class="mono" style="color:var(--danger);">${{ "%.2f"|format(total_cost) }}</td>
+                    <td class="mono" style="color:{% if total_profit >= 0 %}var(--success){% else %}var(--danger){% endif %};">
+                        {% if total_profit >= 0 %}+{% endif %}${{ "%.2f"|format(total_profit) }}
+                    </td>
+                    <td>
+                        <span class="margin-pill" style="background:rgba(124,106,247,0.15);color:var(--accent);">
+                            {{ total_margin }}%
+                        </span>
+                    </td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+
+{% else %}
+<div class="empty-state card">
+    <div class="empty-icon">📊</div>
+    <p style="font-weight:700;font-size:16px;margin-bottom:8px;">No sales in this period</p>
+    <p>Try selecting a different date range.</p>
+</div>
+{% endif %}
+
+</div>
+{% endblock %}

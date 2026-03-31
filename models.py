@@ -189,6 +189,12 @@ class TransactionType(str, enum.Enum):
     ADJUSTMENT = "adjustment"
 
 
+class DiscountType(str, enum.Enum):
+    NONE       = "none"
+    PERCENTAGE = "percentage"
+    FIXED      = "fixed"
+
+
 class Transaction(Base):
     __tablename__ = "transactions"
 
@@ -201,12 +207,24 @@ class Transaction(Base):
     tax_amount       = Column(Float, default=0.0)
     tax_rate         = Column(Float, default=0.0)
     created_at       = Column(DateTime(timezone=True), server_default=func.now())
+    discount_type    = Column(Enum(DiscountType), default=DiscountType.NONE)
+    discount_value   = Column(Float, default=0.0)   # percentage (0-100) or fixed amount
+    discount_amount  = Column(Float, default=0.0)   # computed discount in currency units
     share_token      = Column(String(64), unique=True, nullable=True, index=True)
     supplier_id      = Column(Integer, ForeignKey("suppliers.id"), nullable=True)
 
     shop     = relationship("Shop",     back_populates="transactions")
     supplier = relationship("Supplier",  back_populates="transactions",
                              foreign_keys="[Transaction.supplier_id]")
+
+    @property
+    def subtotal_before_discount(self) -> float:
+        return round(sum(i.subtotal + i.discount_amount for i in self.items), 2)
+
+    @property
+    def grand_total(self) -> float:
+        """total_amount is always the final payable amount (after discount + tax)."""
+        return self.total_amount
     items = relationship("TransactionItem", back_populates="transaction",
                          cascade="all, delete-orphan")
 
@@ -218,10 +236,11 @@ class TransactionItem(Base):
     transaction_id = Column(Integer, ForeignKey("transactions.id"), nullable=False)
     product_id     = Column(Integer, ForeignKey("products.id"), nullable=False)
     batch_id       = Column(Integer, ForeignKey("product_batches.id"), nullable=True)
-    quantity       = Column(Float, nullable=False)
-    unit_price     = Column(Float, nullable=False)
-    subtotal       = Column(Float, nullable=False)
-    lot_number     = Column(String(100), nullable=True)   # snapshot at sale time
+    quantity        = Column(Float, nullable=False)
+    unit_price      = Column(Float, nullable=False)
+    discount_amount = Column(Float, default=0.0)   # line-level discount
+    subtotal        = Column(Float, nullable=False) # after line discount
+    lot_number      = Column(String(100), nullable=True)   # snapshot at sale time
 
     transaction = relationship("Transaction",   back_populates="items")
     product     = relationship("Product",       back_populates="transactions")

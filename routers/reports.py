@@ -110,6 +110,141 @@ async def reports_page(
 
 
 
+
+
+@router.get("/profit", response_class=HTMLResponse)
+async def profit_report(
+    request: Request,
+    period: str = "month",
+    date_from: str = "",
+    date_to: str = "",
+    db: Session = Depends(get_db),
+):
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import func as sqlfunc
+
+    shop = get_shop(request, db)
+    if not shop:
+        return RedirectResponse(url="/login", status_code=302)
+    if not auth.has_role(request, "manager"):
+        return RedirectResponse(url="/dashboard", status_code=302)
+
+    now = datetime.now(timezone.utc)
+
+    if date_from and date_to:
+        try:
+            dt_from = datetime.fromisoformat(date_from).replace(tzinfo=timezone.utc)
+            dt_to   = datetime.fromisoformat(date_to).replace(hour=23, minute=59,
+                       second=59, tzinfo=timezone.utc)
+            period  = "custom"
+        except ValueError:
+            dt_from = now.replace(day=1, hour=0, minute=0, second=0)
+            dt_to   = now
+    elif period == "today":
+        dt_from = now.replace(hour=0, minute=0, second=0)
+        dt_to   = now
+    elif period == "week":
+        dt_from = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0)
+        dt_to   = now
+    elif period == "last_month":
+        first_this = now.replace(day=1, hour=0, minute=0, second=0)
+        dt_to      = first_this - timedelta(seconds=1)
+        dt_from    = dt_to.replace(day=1, hour=0, minute=0, second=0)
+        period     = "last_month"
+    else:  # month (default)
+        dt_from = now.replace(day=1, hour=0, minute=0, second=0)
+        dt_to   = now
+
+    # All sale transactions in range
+    txns = db.query(models.Transaction).filter(
+        models.Transaction.shop_id  == shop.id,
+        models.Transaction.transaction_type == models.TransactionType.SALE,
+        models.Transaction.created_at >= dt_from,
+        models.Transaction.created_at <= dt_to,
+    ).all()
+
+    # Build per-product P&L from items
+    product_stats: dict[int, dict] = {}
+    total_revenue      = 0.0
+    total_cost         = 0.0
+    total_discounts    = 0.0
+    total_transactions = len(txns)
+    total_units_sold   = 0.0
+
+    for txn in txns:
+        total_discounts += txn.discount_amount or 0
+        for item in txn.items:
+            p = item.product
+            if not p:
+                continue
+            pid = item.product_id
+            if pid not in product_stats:
+                product_stats[pid] = {
+                    "id":       pid,
+                    "name":     p.name,
+                    "sku":      p.sku,
+                    "unit":     p.unit,
+                    "category": p.category_name,
+                    "revenue":  0.0,
+                    "cost":     0.0,
+                    "profit":   0.0,
+                    "margin":   0.0,
+                    "qty_sold": 0.0,
+                    "transactions": 0,
+                }
+            revenue = item.subtotal   # already post-line-discount
+            cost    = item.quantity * p.cost_price
+            product_stats[pid]["revenue"]      += revenue
+            product_stats[pid]["cost"]         += cost
+            product_stats[pid]["profit"]       += revenue - cost
+            product_stats[pid]["qty_sold"]     += item.quantity
+            product_stats[pid]["transactions"] += 1
+            total_revenue    += revenue
+            total_cost       += cost
+            total_units_sold += item.quantity
+
+    # Finalize margins
+    for ps in product_stats.values():
+        ps["margin"] = (ps["profit"] / ps["revenue"] * 100) if ps["revenue"] else 0
+        ps["revenue"] = round(ps["revenue"], 2)
+        ps["cost"]    = round(ps["cost"], 2)
+        ps["profit"]  = round(ps["profit"], 2)
+        ps["margin"]  = round(ps["margin"], 1)
+
+    products_sorted = sorted(product_stats.values(), key=lambda x: -x["profit"])
+
+    # Category rollup
+    category_stats: dict[str, dict] = {}
+    for ps in product_stats.values():
+        cat = ps["category"] or "Uncategorised"
+        if cat not in category_stats:
+            category_stats[cat] = {"name": cat, "revenue": 0.0, "cost": 0.0, "profit": 0.0}
+        category_stats[cat]["revenue"] += ps["revenue"]
+        category_stats[cat]["cost"]    += ps["cost"]
+        category_stats[cat]["profit"]  += ps["profit"]
+    for cs in category_stats.values():
+        cs["margin"] = round(cs["profit"] / cs["revenue"] * 100, 1) if cs["revenue"] else 0
+    categories_sorted = sorted(category_stats.values(), key=lambda x: -x["profit"])
+
+    total_profit = round(total_revenue - total_cost, 2)
+    total_margin = round(total_profit / total_revenue * 100, 1) if total_revenue else 0
+
+    return templates.TemplateResponse("reports/profit.html", {
+        "request": request, "shop": shop,
+        "period": period,
+        "date_from": dt_from.strftime("%Y-%m-%d"),
+        "date_to":   dt_to.strftime("%Y-%m-%d"),
+        "total_revenue":      round(total_revenue, 2),
+        "total_cost":         round(total_cost, 2),
+        "total_profit":       total_profit,
+        "total_margin":       total_margin,
+        "total_discounts":    round(total_discounts, 2),
+        "total_transactions": total_transactions,
+        "total_units_sold":   round(total_units_sold, 1),
+        "products":           products_sorted,
+        "categories":         categories_sorted,
+    })
+
 @router.get("/expiry", response_class=HTMLResponse)
 async def expiry_report(request: Request, db: Session = Depends(get_db)):
     shop = get_shop(request, db)
