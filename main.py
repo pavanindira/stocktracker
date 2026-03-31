@@ -1,3 +1,6 @@
+import subprocess
+import sys
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
@@ -11,8 +14,29 @@ from seed import seed_admin
 
 load_dotenv()
 
+
+def run_migrations():
+    """Run Alembic migrations. Works for both Docker and non-Docker setups."""
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "alembic", "upgrade", "head"],
+            capture_output=True,
+            text=True
+        )
+        if result.returncode == 0:
+            print("✅ Database migrations applied successfully")
+        else:
+            print(f"⚠️ Migration warning: {result.stderr}")
+    except FileNotFoundError:
+        # Alembic not installed - might be in a different environment
+        print("⚠️ Alembic not found - skipping migrations")
+    except Exception as e:
+        print(f"⚠️ Migration error: {e}")
+
+
 # Schema is managed by Alembic — run: alembic upgrade head
 # models.Base.metadata.create_all(bind=engine)  # kept for reference only
+run_migrations()
 seed_admin()
 
 app = FastAPI(title="StockTracker", description="Multi-shop stock management system")

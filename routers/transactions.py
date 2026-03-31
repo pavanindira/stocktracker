@@ -65,6 +65,14 @@ async def transaction_create(
     reference = form.get("reference", "")
     notes = form.get("notes", "")
 
+    # Parse discount and tax fields from form
+    discount_type_str = form.get("discount_type", "none")
+    discount_value = float(form.get("discount_value", "0") or "0")
+    tax_rate = float(form.get("tax_rate", "0") or "0")
+
+    # Parse line-level discount if present
+    line_discounts = form.getlist("discount_amount[]")
+
     # Parse items from form (product_id[], quantity[], unit_price[])
     product_ids = form.getlist("product_id[]")
     quantities = form.getlist("quantity[]")
@@ -79,9 +87,9 @@ async def transaction_create(
             "transaction_type": transaction_type, "error": "Please add at least one item."
         })
 
-    total_amount = 0.0
+    subtotal = 0.0
     items_data = []
-    for pid, qty, price in zip(product_ids, quantities, unit_prices):
+    for i, (pid, qty, price) in enumerate(zip(product_ids, quantities, unit_prices)):
         try:
             qty_f = float(qty)
             price_f = float(price)
@@ -94,9 +102,34 @@ async def transaction_create(
         ).first()
         if not product:
             continue
-        subtotal = qty_f * price_f
-        total_amount += subtotal
-        items_data.append((product, qty_f, price_f, subtotal))
+
+        # Calculate line-level discount if present
+        line_discount = 0.0
+        if i < len(line_discounts) and line_discounts[i]:
+            try:
+                line_discount = float(line_discounts[i])
+            except ValueError:
+                line_discount = 0.0
+
+        line_subtotal = qty_f * price_f - line_discount
+        subtotal += line_subtotal
+        items_data.append((product, qty_f, price_f, line_subtotal, line_discount))
+
+    # Calculate discount amount based on discount type
+    discount_amount = 0.0
+    if discount_type_str == "percentage":
+        discount_amount = subtotal * discount_value / 100
+    elif discount_type_str == "fixed":
+        discount_amount = min(discount_value, subtotal)
+
+    # Calculate discounted subtotal
+    discounted_subtotal = subtotal - discount_amount
+
+    # Calculate tax amount on discounted subtotal
+    tax_amount = discounted_subtotal * tax_rate / 100
+
+    # Calculate final total amount
+    total_amount = discounted_subtotal + tax_amount
 
     transaction = models.Transaction(
         shop_id=shop.id,
@@ -104,16 +137,22 @@ async def transaction_create(
         reference=reference or None,
         notes=notes or None,
         total_amount=total_amount,
+        discount_type=models.DiscountType(discount_type_str),
+        discount_value=discount_value,
+        discount_amount=discount_amount,
+        tax_rate=tax_rate,
+        tax_amount=tax_amount,
     )
     db.add(transaction)
     db.flush()
 
-    for product, qty, price, subtotal in items_data:
+    for product, qty, price, subtotal, line_discount in items_data:
         item = models.TransactionItem(
             transaction_id=transaction.id,
             product_id=product.id,
             quantity=qty,
             unit_price=price,
+            discount_amount=line_discount,
             subtotal=subtotal,
         )
         db.add(item)
@@ -144,5 +183,6 @@ async def transaction_detail(request: Request, transaction_id: int, db: Session 
         return RedirectResponse(url="/transactions", status_code=302)
 
     return templates.TemplateResponse("transactions/detail.html", {
-        "request": request, "shop": shop, "transaction": transaction
+        "request": request, "shop": shop, "transaction": transaction,
+        "subtotal_before_discount": transaction.subtotal_before_discount
     })

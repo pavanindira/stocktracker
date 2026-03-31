@@ -155,61 +155,90 @@ async def profit_report(
         dt_from = now.replace(day=1, hour=0, minute=0, second=0)
         dt_to   = now
 
-    # All sale transactions in range
-    txns = db.query(models.Transaction).filter(
-        models.Transaction.shop_id  == shop.id,
+    # Use database aggregation instead of loading all transactions
+    
+    # Get total discounts from transactions
+    discount_result = db.query(
+        sqlfunc.coalesce(sqlfunc.sum(models.Transaction.discount_amount), 0).label('total_discounts'),
+        sqlfunc.count(models.Transaction.id).label('transaction_count')
+    ).filter(
+        models.Transaction.shop_id == shop.id,
         models.Transaction.transaction_type == models.TransactionType.SALE,
         models.Transaction.created_at >= dt_from,
         models.Transaction.created_at <= dt_to,
+    ).first()
+    total_discounts = discount_result.total_discounts or 0
+    total_transactions = discount_result.transaction_count or 0
+
+    # Get product-level aggregations using database queries
+    product_aggregates = db.query(
+        models.TransactionItem.product_id,
+        sqlfunc.sum(models.TransactionItem.subtotal).label('revenue'),
+        sqlfunc.sum(models.TransactionItem.quantity * models.Product.cost_price).label('cost'),
+        sqlfunc.sum(models.TransactionItem.quantity).label('qty_sold'),
+        sqlfunc.count(models.TransactionItem.id).label('item_count')
+    ).join(
+        models.Transaction, models.TransactionItem.transaction_id == models.Transaction.id
+    ).join(
+        models.Product, models.TransactionItem.product_id == models.Product.id
+    ).outerjoin(
+        models.Category, models.Product.category_id == models.Category.id
+    ).filter(
+        models.Transaction.shop_id == shop.id,
+        models.Transaction.transaction_type == models.TransactionType.SALE,
+        models.Transaction.created_at >= dt_from,
+        models.Transaction.created_at <= dt_to,
+    ).group_by(
+        models.TransactionItem.product_id,
+        models.Product.name,
+        models.Product.sku,
+        models.Product.unit,
+        models.Category.name
     ).all()
 
-    # Build per-product P&L from items
+    # Fetch product details for the aggregated results
+    product_ids = [row.product_id for row in product_aggregates]
+    products_map = {}
+    if product_ids:
+        products = db.query(models.Product).filter(
+            models.Product.id.in_(product_ids)
+        ).all()
+        products_map = {p.id: p for p in products}
+
+    # Build per-product P&L from aggregated data
     product_stats: dict[int, dict] = {}
     total_revenue      = 0.0
     total_cost         = 0.0
-    total_discounts    = 0.0
-    total_transactions = len(txns)
     total_units_sold   = 0.0
 
-    for txn in txns:
-        total_discounts += txn.discount_amount or 0
-        for item in txn.items:
-            p = item.product
-            if not p:
-                continue
-            pid = item.product_id
-            if pid not in product_stats:
-                product_stats[pid] = {
-                    "id":       pid,
-                    "name":     p.name,
-                    "sku":      p.sku,
-                    "unit":     p.unit,
-                    "category": p.category_name,
-                    "revenue":  0.0,
-                    "cost":     0.0,
-                    "profit":   0.0,
-                    "margin":   0.0,
-                    "qty_sold": 0.0,
-                    "transactions": 0,
-                }
-            revenue = item.subtotal   # already post-line-discount
-            cost    = item.quantity * p.cost_price
-            product_stats[pid]["revenue"]      += revenue
-            product_stats[pid]["cost"]         += cost
-            product_stats[pid]["profit"]       += revenue - cost
-            product_stats[pid]["qty_sold"]     += item.quantity
-            product_stats[pid]["transactions"] += 1
-            total_revenue    += revenue
-            total_cost       += cost
-            total_units_sold += item.quantity
-
-    # Finalize margins
-    for ps in product_stats.values():
-        ps["margin"] = (ps["profit"] / ps["revenue"] * 100) if ps["revenue"] else 0
-        ps["revenue"] = round(ps["revenue"], 2)
-        ps["cost"]    = round(ps["cost"], 2)
-        ps["profit"]  = round(ps["profit"], 2)
-        ps["margin"]  = round(ps["margin"], 1)
+    for row in product_aggregates:
+        p = products_map.get(row.product_id)
+        if not p:
+            continue
+        
+        pid = row.product_id
+        revenue = row.revenue or 0
+        cost = row.cost or 0
+        qty_sold = row.qty_sold or 0
+        item_count = row.item_count or 0
+        
+        product_stats[pid] = {
+            "id":       pid,
+            "name":     p.name,
+            "sku":      p.sku,
+            "unit":     p.unit,
+            "category": p.category_name,
+            "revenue":  round(revenue, 2),
+            "cost":     round(cost, 2),
+            "profit":   round(revenue - cost, 2),
+            "margin":   round((revenue - cost) / revenue * 100, 1) if revenue else 0,
+            "qty_sold": qty_sold,
+            "transactions": item_count,
+        }
+        
+        total_revenue    += revenue
+        total_cost       += cost
+        total_units_sold += qty_sold
 
     products_sorted = sorted(product_stats.values(), key=lambda x: -x["profit"])
 
