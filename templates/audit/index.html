@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Audit Log — StockTracker{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div><h2>Audit Log</h2><div class="subtitle">// {{ total }} ENTR{{ 'IES' if total != 1 else 'Y' }} · PAGE {{ page }}/{{ pages }}</div></div>
+</div>
+<div class="content">
+<form method="get" action="/audit" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+    <select name="action" onchange="this.form.submit()" style="min-width:160px;">
+        <option value="">All Actions</option>
+        {% for a in actions %}
+        <option value="{{ a }}" {% if filter_action == a %}selected{% endif %}>{{ a }}</option>
+        {% endfor %}
+    </select>
+    <select name="actor" onchange="this.form.submit()" style="min-width:160px;">
+        <option value="">All Users</option>
+        {% for a in actors %}
+        <option value="{{ a }}" {% if filter_actor == a %}selected{% endif %}>{{ a }}</option>
+        {% endfor %}
+    </select>
+    {% if filter_action or filter_actor %}
+    <a href="/audit" class="btn btn-secondary btn-sm">✕ Clear</a>
+    {% endif %}
+</form>
+
+{% if logs %}
+<div class="card" style="padding:0;">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr><th>Time</th><th>User</th><th>Action</th><th>Entity</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+            {% for log in logs %}
+            {% set action_colors = {
+                'SALE': 'var(--success)', 'RETURN': 'var(--danger)',
+                'PURCHASE': 'var(--accent)', 'ADJUSTMENT': '#f5a623',
+                'CREATE_PO': 'var(--accent)', 'RECEIVE_PO': 'var(--success)',
+                'CREATE_CUSTOMER': 'var(--accent)', 'DELETE_CUSTOMER': 'var(--danger)',
+                'CANCEL_PO': 'var(--danger)',
+            } %}
+            <tr>
+                <td style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono);white-space:nowrap;">
+                    {{ log.created_at.strftime('%d %b %Y') if log.created_at }}<br>
+                    {{ log.created_at.strftime('%H:%M:%S') if log.created_at }}
+                </td>
+                <td>
+                    <div style="font-weight:700;font-size:13px;">{{ log.actor_name }}</div>
+                    {% if log.actor_role %}<div style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono);">{{ log.actor_role }}</div>{% endif %}
+                </td>
+                <td>
+                    <span class="badge" style="font-family:var(--font-mono);font-size:10px;background:{{ action_colors.get(log.action, 'var(--text-muted)') }}22;color:{{ action_colors.get(log.action, 'var(--text-muted)') }};border:1px solid {{ action_colors.get(log.action, 'var(--text-muted)') }}44;">
+                        {{ log.action }}
+                    </span>
+                </td>
+                <td style="font-size:12px;color:var(--text-muted);">
+                    {% if log.entity_type %}
+                    {{ log.entity_type }}
+                    {% if log.entity_id %}
+                    <span class="mono">#{{ log.entity_id }}</span>
+                    {% endif %}
+                    {% else %}—{% endif %}
+                </td>
+                <td style="font-size:13px;max-width:300px;">{{ log.description or '—' }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Pagination -->
+{% if pages > 1 %}
+<div style="display:flex;gap:8px;margin-top:16px;justify-content:center;flex-wrap:wrap;">
+    {% for p in range(1, pages + 1) %}
+    <a href="/audit?page={{ p }}&action={{ filter_action }}&actor={{ filter_actor }}"
+       class="btn {% if p == page %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">{{ p }}</a>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="empty-state card">
+    <div class="empty-icon">📜</div>
+    <p style="font-weight:700;font-size:16px;margin-bottom:8px;">No audit entries{% if filter_action or filter_actor %} matching filters{% endif %}</p>
+    {% if filter_action or filter_actor %}<a href="/audit" class="btn btn-secondary">Clear Filters</a>{% endif %}
+</div>
+{% endif %}
+</div>
+{% endblock %}

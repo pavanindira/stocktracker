@@ -2,10 +2,39 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+
+    <!-- Camera — required for barcode scanning -->
+    <key>NSCameraUsageDescription</key>
+    <string>StockTracker uses the camera to scan product barcodes.</string>
+
+    <!-- Photo library — used for saving label PDFs -->
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>StockTracker saves QR label PDFs to your photo library.</string>
+
+    <!-- File access — for CSV import and PDF download -->
+    <key>NSDocumentsFolderUsageDescription</key>
+    <string>StockTracker reads CSV files for bulk product import.</string>
+
+    <!-- Push notifications (FCM) -->
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>fetch</string>
+        <string>remote-notification</string>
+    </array>
+
+    <!--
+        FCM SETUP REQUIRED FOR iOS:
+        1. Go to https://console.firebase.google.com
+        2. Add an iOS app to your Firebase project
+        3. Download GoogleService-Info.plist and add it to ios/Runner/ in Xcode
+        4. Enable Push Notifications capability in Xcode (Signing & Capabilities tab)
+        5. Upload your APNs auth key in Firebase console (Project Settings > Cloud Messaging)
+        6. Run: cd ios && pod install
+    -->
+
+    <!-- Flutter standard keys -->
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
-    <key>CFBundleDisplayName</key>
-    <string>StockTracker</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -13,7 +42,7 @@
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>stocktracker</string>
+    <string>StockTracker</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -24,9 +53,6 @@
     <string>$(FLUTTER_BUILD_NUMBER)</string>
     <key>LSRequiresIPhoneOS</key>
     <true/>
-    <!-- Camera permission for barcode scanning -->
-    <key>NSCameraUsageDescription</key>
-    <string>Camera is used to scan product barcodes.</string>
     <key>UILaunchStoryboardName</key>
     <string>LaunchScreen</string>
     <key>UIMainStoryboardFile</key>
@@ -37,14 +63,8 @@
         <string>UIInterfaceOrientationLandscapeLeft</string>
         <string>UIInterfaceOrientationLandscapeRight</string>
     </array>
-    <key>UISupportedInterfaceOrientations~ipad</key>
-    <array>
-        <string>UIInterfaceOrientationPortrait</string>
-        <string>UIInterfaceOrientationPortraitUpsideDown</string>
-        <string>UIInterfaceOrientationLandscapeLeft</string>
-        <string>UIInterfaceOrientationLandscapeRight</string>
-    </array>
     <key>UIViewControllerBasedStatusBarAppearance</key>
     <false/>
+
 </dict>
 </plist>

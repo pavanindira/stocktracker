@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Create Return — Sale #{{ original.id }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div><h2>Create Return</h2><div class="subtitle">// AGAINST SALE #{{ original.id }}</div></div>
+    <a href="/transactions/{{ original.id }}" class="btn btn-secondary">← Back to Sale</a>
+</div>
+<div class="content"><div style="max-width:680px;">
+<div style="padding:12px 16px;background:rgba(231,76,60,0.08);border:1px solid rgba(231,76,60,0.2);border-radius:8px;margin-bottom:20px;font-size:13px;">
+    ↩ Items returned will be restocked immediately. Enter the quantity being returned for each product.
+</div>
+<form method="post" action="/transactions/{{ original.id }}/return">
+<div class="card" style="padding:0;margin-bottom:20px;">
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Product</th><th>Originally Sold</th><th>Returning</th><th>Refund Value</th></tr></thead>
+            <tbody>
+            {% for item in original.items %}
+            <tr>
+                <td>
+                    <input type="hidden" name="product_id[]" value="{{ item.product_id }}">
+                    <div style="font-weight:700;">{{ item.product.name if item.product else '—' }}</div>
+                    <div class="mono" style="font-size:11px;color:var(--text-muted);">@ ${{ "%.2f"|format(item.unit_price) }} each</div>
+                </td>
+                <td class="mono">{{ item.quantity }} {{ item.product.unit if item.product else '' }}</td>
+                <td>
+                    <input type="number" name="quantity[]"
+                           step="0.01" min="0" max="{{ item.quantity }}"
+                           value="{{ item.quantity }}"
+                           id="qty_{{ loop.index }}"
+                           oninput="updateRefund({{ loop.index }}, {{ item.unit_price }})"
+                           style="width:90px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);">
+                </td>
+                <td class="mono" id="refund_{{ loop.index }}" style="color:var(--danger);font-weight:700;">
+                    ${{ "%.2f"|format(item.subtotal) }}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+<div class="card" style="margin-bottom:20px;">
+    <div class="form-group">
+        <label>Return Notes</label>
+        <input type="text" name="notes" placeholder="Reason for return (optional)">
+    </div>
+</div>
+<div style="display:flex;gap:12px;align-items:center;">
+    <button type="submit" class="btn btn-danger" onclick="return confirm('Create this return and restock items?')">
+        ↩ Confirm Return
+    </button>
+    <a href="/transactions/{{ original.id }}" class="btn btn-secondary">Cancel</a>
+    <span style="margin-left:8px;font-family:var(--font-mono);font-size:12px;color:var(--text-muted);">
+        Total refund: <strong id="total-refund" style="color:var(--danger);">${{ "%.2f"|format(original.total_amount) }}</strong>
+    </span>
+</div>
+</form>
+</div></div>
+{% endblock %}
+{% block extra_js %}
+<script>
+const prices = {{% for item in original.items %}{{ loop.index }}: {{ item.unit_price }},{% endfor %}};
+function updateRefund(idx, price) {
+    const qty   = parseFloat(document.getElementById('qty_' + idx).value) || 0;
+    const val   = qty * price;
+    document.getElementById('refund_' + idx).textContent = '$' + val.toFixed(2);
+    let total = 0;
+    document.querySelectorAll('[id^="refund_"]').forEach(el => {
+        total += parseFloat(el.textContent.replace('$','')) || 0;
+    });
+    document.getElementById('total-refund').textContent = '$' + total.toFixed(2);
+}
+</script>
+{% endblock %}

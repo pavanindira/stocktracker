@@ -128,7 +128,7 @@ def upgrade() -> None:
         sa.Column("id",               sa.Integer(),  primary_key=True),
         sa.Column("shop_id",          sa.Integer(),  sa.ForeignKey("shops.id", ondelete="CASCADE"), nullable=False),
         sa.Column("supplier_id",      sa.Integer(),  sa.ForeignKey("suppliers.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("transaction_type", sa.Enum("purchase", "sale", "adjustment", name="transactiontype"), nullable=False),
+        sa.Column("transaction_type", sa.Enum("purchase", "sale", "adjustment", "return", name="transactiontype"), nullable=False),
         sa.Column("reference",        sa.String(100), nullable=True),
         sa.Column("notes",            sa.Text(),      nullable=True),
         sa.Column("total_amount",     sa.Float(),     server_default="0"),

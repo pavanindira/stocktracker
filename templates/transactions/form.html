@@ -58,6 +58,17 @@
                     <input type="number" name="tax_rate" id="tax-rate"
                            step="0.1" min="0" max="100" value="0" style="max-width:120px;">
                 </div>
+                {% if transaction_type == 'sale' %}
+                <div class="form-group">
+                    <label>Customer</label>
+                    <select name="customer_id" style="max-width:200px;">
+                        <option value="">Walk-in (no customer)</option>
+                        {% for c in customers %}
+                        <option value="{{ c.id }}">{{ c.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
             </div>
             <!-- Discount row -->
             <div class="form-grid" style="margin-top:0;">

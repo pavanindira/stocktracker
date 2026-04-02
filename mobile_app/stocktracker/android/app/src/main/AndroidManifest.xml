@@ -1,14 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Core permissions -->
     <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
+
+    <!-- FCM: POST_NOTIFICATIONS required on Android 13+ -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- FCM: needed to receive pushes when device is idle -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
 
     <application
         android:label="StockTracker"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -25,6 +34,28 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+
+        <!-- FCM background message receiver -->
+        <service
+            android:name="com.google.firebase.messaging.FirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT"/>
+            </intent-filter>
+        </service>
+
+        <!--
+            FCM SETUP REQUIRED:
+            1. Go to https://console.firebase.google.com
+            2. Create a project and add an Android app (package name: com.example.stocktracker)
+            3. Download google-services.json and place it in android/app/
+            4. Add to android/build.gradle:
+                   classpath 'com.google.gms:google-services:4.4.0'
+            5. Add to android/app/build.gradle:
+                   apply plugin: 'com.google.gms.google-services'
+            6. Set FCM_SERVER_KEY in your .env from the Firebase console (Cloud Messaging settings)
+        -->
+
         <meta-data
             android:name="flutterEmbedding"
             android:value="2"/>

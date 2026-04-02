@@ -314,7 +314,9 @@ def list_products(session=Depends(get_current_session), db: Session = Depends(ge
     q = db.query(models.Product).filter(
         models.Product.shop_id == shop.id, models.Product.is_active == True)
     if search:
-        q = q.filter(models.Product.name.ilike(f"%{search}%"))
+        # Escape LIKE wildcards
+        esc = search.replace('%', r'\%').replace('_', r'\_')
+        q = q.filter(models.Product.name.ilike(f"%{esc}%", escape='\\'))
     if category_id:
         q = q.filter(models.Product.category_id == category_id)
     if updated_since:
@@ -957,3 +959,59 @@ def _sub_user_json(s: models.ShopSubUser) -> dict:
     return {"id": s.id, "name": s.name, "username": s.username,
             "role": s.role.value, "is_active": s.is_active,
             "created_at": s.created_at.isoformat()}
+
+
+# ── Device Token Registration (FCM Push Notifications) ───────────────────────
+
+@router.post("/device/register")
+async def register_device(
+    request: Request,
+    session = Depends(get_current_session),
+    db: Session = Depends(get_db),
+):
+    """
+    Register a device token for push notifications.
+    Called by the mobile app after login to enable FCM push notifications.
+    
+    Request body (JSON):
+    {
+        "token": "firebase-cloud-messaging-token",
+        "platform": "android" | "ios"
+    }
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+    
+    token = body.get("token")
+    platform = body.get("platform", "")
+    
+    if not token:
+        raise HTTPException(status_code=400, detail="token is required")
+    
+    shop = session["shop"]
+    user_name = session.get("user_name") or session.get("username") or "unknown"
+    
+    # Check if token already exists
+    existing = db.query(models.DeviceToken).filter(
+        models.DeviceToken.token == token
+    ).first()
+    
+    if existing:
+        # Update existing token
+        existing.shop_id = shop.id
+        existing.platform = platform
+        existing.actor_name = user_name
+        existing.updated_at = func.now()
+    else:
+        # Create new token
+        db.add(models.DeviceToken(
+            shop_id=shop.id,
+            token=token,
+            platform=platform,
+            actor_name=user_name,
+        ))
+    
+    db.commit()
+    return {"status": "ok", "message": "Device token registered"}

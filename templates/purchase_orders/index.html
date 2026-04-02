@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Purchase Orders — StockTracker{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div><h2>Purchase Orders</h2><div class="subtitle">// {{ pos | length }} ORDER{{ 'S' if pos | length != 1 }}</div></div>
+    <div style="display:flex;gap:10px;">
+        <a href="/suppliers/reorder/suggestions" class="btn btn-secondary">⟳ Reorder Suggestions</a>
+        <a href="/purchase-orders/new" class="btn btn-primary">+ New PO</a>
+    </div>
+</div>
+<div class="content">
+{% if pos %}
+<div class="card" style="padding:0;">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr><th>PO #</th><th>Supplier</th><th>Status</th><th>Items</th><th>Total</th><th>Expected</th><th>Created</th><th></th></tr>
+            </thead>
+            <tbody>
+            {% for po in pos %}
+            {% set status_colors = {'draft': 'var(--text-muted)', 'sent': 'var(--accent)', 'partially_received': 'var(--warning, #f5a623)', 'completed': 'var(--success)', 'cancelled': 'var(--danger)'} %}
+            <tr>
+                <td class="mono" style="font-weight:700;">
+                    <a href="/purchase-orders/{{ po.id }}" style="color:var(--accent);text-decoration:none;">PO-{{ po.id }}</a>
+                    {% if po.reference %}<div style="font-size:10px;color:var(--text-muted);">{{ po.reference }}</div>{% endif %}
+                </td>
+                <td>{{ po.supplier.name if po.supplier else '—' }}</td>
+                <td>
+                    <span class="badge" style="background:{{ status_colors[po.status.value] }}22;color:{{ status_colors[po.status.value] }};border:1px solid {{ status_colors[po.status.value] }}44;font-family:var(--font-mono);font-size:10px;">
+                        {{ po.status.value | replace('_',' ') | upper }}
+                    </span>
+                </td>
+                <td class="mono" style="font-size:12px;">{{ po.items | length }}</td>
+                <td class="mono" style="font-weight:700;">${{ "%.2f"|format(po.total_amount) }}</td>
+                <td style="font-size:12px;color:var(--text-muted);">
+                    {% if po.expected_delivery %}{{ po.expected_delivery.strftime('%d %b %Y') }}{% else %}—{% endif %}
+                </td>
+                <td style="font-size:12px;color:var(--text-muted);">{{ po.created_at.strftime('%d %b %Y') if po.created_at }}</td>
+                <td>
+                    <div style="display:flex;gap:6px;">
+                        <a href="/purchase-orders/{{ po.id }}" class="btn btn-secondary btn-sm">View</a>
+                        {% if po.status.value in ['sent','partially_received'] %}
+                        <a href="/purchase-orders/{{ po.id }}/receive" class="btn btn-primary btn-sm">Receive</a>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="empty-state card">
+    <div class="empty-icon">📋</div>
+    <p style="font-weight:700;font-size:16px;margin-bottom:8px;">No purchase orders yet</p>
+    <p style="margin-bottom:20px;">Create a PO to track what you've ordered from suppliers.</p>
+    <a href="/purchase-orders/new" class="btn btn-primary">+ Create First PO</a>
+</div>
+{% endif %}
+</div>
+{% endblock %}

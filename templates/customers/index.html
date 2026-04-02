@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Customers — StockTracker{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div><h2>Customers</h2><div class="subtitle">// {{ customers | length }} CUSTOMER{{ 'S' if customers | length != 1 }}</div></div>
+    <a href="/customers/new" class="btn btn-primary">+ New Customer</a>
+</div>
+<div class="content">
+<form method="get" action="/customers" style="margin-bottom:16px;">
+    <input type="text" name="search" value="{{ search }}" placeholder="Search by name, phone or email…"
+           style="max-width:360px;" onchange="this.form.submit()">
+</form>
+{% if customers %}
+<div class="card" style="padding:0;">
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Visits</th><th>Total Spent</th><th>Points</th><th></th></tr></thead>
+            <tbody>
+            {% for c in customers %}
+            <tr>
+                <td><a href="/customers/{{ c.id }}" style="font-weight:700;color:var(--accent);text-decoration:none;">{{ c.name }}</a></td>
+                <td style="font-size:12px;">{{ c.phone or '—' }}</td>
+                <td style="font-size:12px;">{{ c.email or '—' }}</td>
+                <td class="mono">{{ c.visit_count }}</td>
+                <td class="mono" style="font-weight:700;">${{ "%.2f"|format(c.total_spent) }}</td>
+                <td class="mono" style="color:var(--accent);">{{ c.loyalty_points | int }}</td>
+                <td>
+                    <div style="display:flex;gap:6px;">
+                        <a href="/customers/{{ c.id }}/edit" class="btn btn-secondary btn-sm">Edit</a>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="empty-state card">
+    <div class="empty-icon">👤</div>
+    <p style="font-weight:700;font-size:16px;margin-bottom:8px;">{% if search %}No customers match "{{ search }}"{% else %}No customers yet{% endif %}</p>
+    {% if not search %}<a href="/customers/new" class="btn btn-primary">+ Add First Customer</a>{% endif %}
+</div>
+{% endif %}
+</div>
+{% endblock %}
+EOF
+
+cat > /mnt/user-data/outputs/stocktracker/templates/customers/form.html << 'EOF'
+{% extends "base.html" %}
+{% block title %}{% if customer %}Edit Customer{% else %}New Customer{% endif %} — StockTracker{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div><h2>{% if customer %}Edit {{ customer.name }}{% else %}New Customer{% endif %}</h2><div class="subtitle">// CUSTOMER DETAILS</div></div>
+    <a href="/customers" class="btn btn-secondary">← Back</a>
+</div>
+<div class="content"><div style="max-width:560px;">
+<div class="card">
+    <form method="post" action="/customers/{% if customer %}{{ customer.id }}/edit{% else %}new{% endif %}">
+        <div class="form-group">
+            <label>Full Name <span style="color:var(--danger)">*</span></label>
+            <input type="text" name="name" required value="{{ customer.name if customer else '' }}">
+        </div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Phone</label>
+                <input type="tel" name="phone" value="{{ customer.phone or '' if customer else '' }}">
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" name="email" value="{{ customer.email or '' if customer else '' }}">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Notes</label>
+            <textarea name="notes" rows="2">{{ customer.notes or '' if customer else '' }}</textarea>
+        </div>
+        <hr>
+        <div style="display:flex;gap:12px;">
+            <button type="submit" class="btn btn-primary">{% if customer %}Save Changes{% else %}Add Customer{% endif %}</button>
+            <a href="/customers{% if customer %}/{{ customer.id }}{% endif %}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+</div></div>
+{% endblock %}
+EOF
+
+cat > /mnt/user-data/outputs/stocktracker/templates/customers/detail.html << 'EOF'
+{% extends "base.html" %}
+{% block title %}{{ customer.name }} — StockTracker{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div><h2>{{ customer.name }}</h2><div class="subtitle">// CUSTOMER PROFILE</div></div>
+    <div style="display:flex;gap:8px;">
+        <a href="/customers/{{ customer.id }}/edit" class="btn btn-secondary">Edit</a>
+        <a href="/customers" class="btn btn-ghost">← All Customers</a>
+    </div>
+</div>
+<div class="content">
+<div class="stats-grid" style="margin-bottom:24px;">
+    <div class="stat-card"><div class="stat-label">Total Spent</div><div class="stat-value">${{ "%.2f"|format(customer.total_spent) }}</div></div>
+    <div class="stat-card"><div class="stat-label">Visits</div><div class="stat-value">{{ customer.visit_count }}</div></div>
+    <div class="stat-card"><div class="stat-label">Loyalty Points</div><div class="stat-value" style="color:var(--accent);">{{ customer.loyalty_points | int }}</div></div>
+    <div class="stat-card"><div class="stat-label">Member Since</div><div class="stat-value" style="font-size:14px;">{{ customer.created_at.strftime('%d %b %Y') if customer.created_at else '—' }}</div></div>
+</div>
+<div class="grid-2" style="gap:20px;align-items:start;">
+    <div class="card">
+        <div class="card-title" style="margin-bottom:12px;">CONTACT</div>
+        {% if customer.phone %}<div style="margin-bottom:8px;"><span style="color:var(--text-muted);font-size:12px;">📞 </span>{{ customer.phone }}</div>{% endif %}
+        {% if customer.email %}<div style="margin-bottom:8px;"><span style="color:var(--text-muted);font-size:12px;">✉ </span><a href="mailto:{{ customer.email }}" style="color:var(--accent);">{{ customer.email }}</a></div>{% endif %}
+        {% if customer.notes %}<div style="margin-top:12px;padding:10px;background:var(--surface2);border-radius:6px;font-size:13px;color:var(--text-muted);">{{ customer.notes }}</div>{% endif %}
+        {% if not customer.phone and not customer.email and not customer.notes %}
+        <p style="color:var(--text-muted);font-size:13px;">No contact details recorded.</p>
+        {% endif %}
+    </div>
+    <div class="card" style="padding:0;">
+        <div style="padding:16px 20px 0;"><div class="card-title">RECENT TRANSACTIONS</div></div>
+        {% if transactions %}
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Date</th><th>Type</th><th>Items</th><th>Total</th><th></th></tr></thead>
+                <tbody>
+                {% for t in transactions %}
+                <tr>
+                    <td style="font-size:12px;color:var(--text-muted);">{{ t.created_at.strftime('%d %b %Y') if t.created_at }}</td>
+                    <td><span class="badge {% if t.transaction_type.value == 'sale' %}badge-success{% elif t.transaction_type.value == 'return' %}badge-danger{% else %}badge-muted{% endif %}">{{ t.transaction_type.value | upper }}</span></td>
+                    <td class="mono" style="font-size:12px;">{{ t.items | length }}</td>
+                    <td class="mono" style="font-weight:700;">${{ "%.2f"|format(t.total_amount) }}</td>
+                    <td><a href="/transactions/{{ t.id }}" class="btn btn-ghost btn-sm">View</a></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state" style="padding:24px;"><p style="color:var(--text-muted);">No transactions yet.</p></div>
+        {% endif %}
+    </div>
+</div>
+</div>
+{% endblock %}

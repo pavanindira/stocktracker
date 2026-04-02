@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from database import get_db
+from audit import log_action, _sanitize_for_log
 import models
 import urllib.request
 import urllib.error
@@ -139,7 +140,9 @@ async def products_list(
         models.Product.is_active == True
     )
     if search:
-        query = query.filter(models.Product.name.ilike(f"%{search}%"))
+        # Escape LIKE wildcards
+        esc = search.replace('%', r'\%').replace('_', r'\_')
+        query = query.filter(models.Product.name.ilike(f"%{esc}%", escape='\\'))
     if category_id and category_id.isdigit():
         query = query.filter(models.Product.category_id == int(category_id))
 
@@ -197,6 +200,9 @@ async def product_create(
         low_stock_threshold=low_stock_threshold,
     )
     db.add(product)
+    db.flush()
+    log_action(db, shop.id, request, "CREATE_PRODUCT", "product", product.id,
+                f"Created product: {_sanitize_for_log(product.name)}")
     db.commit()
     return RedirectResponse(url="/products", status_code=302)
 
@@ -257,6 +263,8 @@ async def product_update(
     product.selling_price = selling_price
     product.stock_quantity = stock_quantity
     product.low_stock_threshold = low_stock_threshold
+    log_action(db, shop.id, request, "EDIT_PRODUCT", "product", product.id,
+                f"Edited product: {_sanitize_for_log(product.name)}")
     db.commit()
     return RedirectResponse(url="/products", status_code=302)
 
@@ -275,5 +283,7 @@ async def product_delete(request: Request, product_id: int, db: Session = Depend
     ).first()
     if product:
         product.is_active = False
+        log_action(db, shop.id, request, "DELETE_PRODUCT", "product", product.id,
+                    f"Deleted product: {_sanitize_for_log(product.name)}")
         db.commit()
     return RedirectResponse(url="/products", status_code=302)

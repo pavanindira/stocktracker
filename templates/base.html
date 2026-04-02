@@ -411,6 +411,15 @@
             <a href="/team" class="{{ 'active' if '/team' in request.url.path else '' }}">
                 <span class="icon">👥</span> Team
             </a>
+            <a href="/purchase-orders" class="{{ \'active\' if \'/purchase-orders\' in request.url.path else \'\' }}">
+                <span class="icon">📋</span> Purchase Orders
+            </a>
+            <a href="/customers" class="{{ \'active\' if \'/customers\' in request.url.path else \'\' }}">
+                <span class="icon">👤</span> Customers
+            </a>
+            <a href="/audit" class="{{ \'active\' if \'/audit\' in request.url.path else \'\' }}">
+                <span class="icon">📜</span> Audit Log
+            </a>
             {% endif %}
         </nav>
         <div class="sidebar-footer" style="display: flex; flex-direction: column; gap: 10px;">

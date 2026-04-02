@@ -41,6 +41,8 @@ def login_sub_user(request: Request, sub: models.ShopSubUser, shop: models.Shop)
     request.session["role"]        = sub.role.value
     request.session["sub_user_id"] = sub.id
     request.session["user_name"]   = sub.name
+    # Also set sub_user_name for consistency with audit.py expectations
+    request.session["sub_user_name"] = sub.name
 
 
 def logout_shop(request: Request):

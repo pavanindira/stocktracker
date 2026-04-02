@@ -44,7 +44,9 @@ async def labels_select(
         models.Product.is_active == True,
     )
     if search:
-        query = query.filter(models.Product.name.ilike(f"%{search}%"))
+        # Escape LIKE wildcards
+        esc = search.replace('%', r'\%').replace('_', r'\_')
+        query = query.filter(models.Product.name.ilike(f"%{esc}%", escape='\\'))
     if category_id and category_id.isdigit():
         query = query.filter(models.Product.category_id == int(category_id))
     products = query.order_by(models.Product.name).all()

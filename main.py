@@ -9,7 +9,7 @@ import models
 import os
 from dotenv import load_dotenv
 
-from routers import auth_router, dashboard, products, transactions, reports, admin, categories, api, team, labels, import_csv, receipt_public, suppliers, stocktake
+from routers import auth_router, dashboard, products, transactions, reports, admin, categories, api, team, labels, import_csv, receipt_public, suppliers, stocktake, purchase_orders, customers, audit_router
 from seed import seed_admin
 
 load_dotenv()
@@ -39,6 +39,28 @@ def run_migrations():
 run_migrations()
 seed_admin()
 
+# ── Background scheduler (push notifications + email digest) ─────────────────
+from contextlib import asynccontextmanager
+from apscheduler.schedulers.background import BackgroundScheduler
+import notifications as notif
+
+scheduler = BackgroundScheduler(timezone="UTC")
+DIGEST_HOUR = max(0, min(23, int(os.getenv("DIGEST_HOUR", "8"))))
+
+@asynccontextmanager
+async def lifespan(app):
+    scheduler.add_job(notif.check_low_stock_and_expiry, "interval", hours=6,
+                      id="push_alerts", replace_existing=True)
+    scheduler.add_job(notif.send_daily_digest, "cron", hour=DIGEST_HOUR,
+                      id="email_digest", replace_existing=True)
+    scheduler.start()
+    yield
+    scheduler.shutdown()
+
+# Only run scheduler if explicitly enabled - prevents duplicate jobs with multiple workers
+if os.getenv("RUN_SCHEDULER", "true").lower() == "true":
+    app.router.lifespan_context = lifespan
+
 app = FastAPI(title="StockTracker", description="Multi-shop stock management system")
 
 SECRET_KEY = os.getenv("SECRET_KEY", "change-this-secret-key-in-production")
@@ -63,5 +85,8 @@ app.include_router(import_csv.router)
 app.include_router(receipt_public.router)
 app.include_router(suppliers.router)
 app.include_router(stocktake.router)
+app.include_router(purchase_orders.router)
+app.include_router(customers.router)
+app.include_router(audit_router.router)
 app.include_router(admin.router)
 app.include_router(api.router)

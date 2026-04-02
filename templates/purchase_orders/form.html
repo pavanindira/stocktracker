@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}{% if po %}Edit PO-{{ po.id }}{% else %}New Purchase Order{% endif %} — StockTracker{% endblock %}
+{% block extra_head %}
+<style>
+.po-row input { padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div><h2>{% if po %}Edit PO-{{ po.id }}{% else %}New Purchase Order{% endif %}</h2><div class="subtitle">// ORDER DETAILS</div></div>
+    <a href="/purchase-orders" class="btn btn-secondary">← Back</a>
+</div>
+<div class="content">
+<form method="post" action="/purchase-orders/{% if po %}{{ po.id }}/edit{% else %}new{% endif %}">
+<div class="grid-2" style="gap:20px;align-items:start;">
+
+    <!-- Left: header -->
+    <div class="card">
+        <div class="card-title" style="margin-bottom:16px;">ORDER INFO</div>
+        <div class="form-group">
+            <label>Supplier</label>
+            <select name="supplier_id">
+                <option value="">— No supplier —</option>
+                {% for s in suppliers %}
+                <option value="{{ s.id }}"
+                    {% if (po and po.supplier_id == s.id) or selected_supplier_id == s.id %}selected{% endif %}>
+                    {{ s.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Reference / PO Number</label>
+            <input type="text" name="reference" placeholder="e.g. MY-PO-001 (optional)"
+                   value="{{ po.reference or '' if po else '' }}">
+        </div>
+        <div class="form-group">
+            <label>Expected Delivery</label>
+            <input type="date" name="expected_delivery"
+                   value="{{ po.expected_delivery.strftime('%Y-%m-%d') if po and po.expected_delivery else '' }}">
+        </div>
+        <div class="form-group">
+            <label>Notes</label>
+            <textarea name="notes" rows="2">{{ po.notes or '' if po else '' }}</textarea>
+        </div>
+    </div>
+
+    <!-- Right: items -->
+    <div class="card" style="padding:0;">
+        <div style="padding:16px 20px;display:flex;justify-content:space-between;align-items:center;">
+            <div class="card-title">LINE ITEMS</div>
+            <button type="button" id="add-row" class="btn btn-secondary btn-sm">+ Add Item</button>
+        </div>
+        <div class="table-wrap">
+            <table id="po-table">
+                <thead><tr><th style="width:40%">Product</th><th style="width:18%">Qty</th><th style="width:20%">Unit Price</th><th style="width:15%">Subtotal</th><th style="width:7%"></th></tr></thead>
+                <tbody id="po-body">
+                {% if po %}
+                {% for item in po.items %}
+                <tr class="po-row" data-row="{{ loop.index }}">
+                    <td>
+                        <select name="product_id[]" style="width:100%">
+                            {% for p in products %}
+                            <option value="{{ p.id }}" {% if p.id == item.product_id %}selected{% endif %}>{{ p.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                    <td><input type="number" name="quantity[]" step="0.01" min="0.01" value="{{ item.quantity_ordered }}" oninput="updateTotal()" style="width:80px"></td>
+                    <td><input type="number" name="unit_price[]" step="0.01" min="0" value="{{ item.unit_price }}" oninput="updateTotal()" style="width:90px"></td>
+                    <td class="subtotal-cell mono" style="padding:8px 12px;">$0.00</td>
+                    <td><button type="button" onclick="this.closest('tr').remove();updateTotal();" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;">×</button></td>
+                </tr>
+                {% endfor %}
+                {% endif %}
+                </tbody>
+            </table>
+        </div>
+        <div style="padding:12px 20px;display:flex;justify-content:flex-end;gap:20px;border-top:1px solid var(--border);">
+            <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);">TOTAL</span>
+            <span id="total-display" style="font-family:var(--font-mono);font-weight:800;">$0.00</span>
+        </div>
+    </div>
+</div>
+
+<div style="margin-top:20px;display:flex;gap:12px;">
+    <button type="submit" class="btn btn-primary">{% if po %}Save Changes{% else %}Create Purchase Order{% endif %}</button>
+    <a href="/purchase-orders" class="btn btn-secondary">Cancel</a>
+</div>
+</form>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+const products = [{% for p in products %}{ id:{{ p.id }}, name:{{ p.name | tojson }}, price:{{ p.cost_price }} },{% endfor %}];
+
+function buildOptions(selectedId) {
+    return products.map(p =>
+        `<option value="${p.id}" data-price="${p.price}" ${p.id===selectedId?'selected':''}>${p.name}</option>`
+    ).join('');
+}
+
+let rowCount = {{ po.items | length if po else 0 }};
+function addRow(selId, qty, price) {
+    rowCount++;
+    const tr = document.createElement('tr');
+    tr.className = 'po-row'; tr.dataset.row = rowCount;
+    tr.innerHTML = `
+        <td><select name="product_id[]" style="width:100%" onchange="fillPrice(this)">${buildOptions(selId||null)}</select></td>
+        <td><input type="number" name="quantity[]" step="0.01" min="0.01" value="${qty||1}" oninput="updateTotal()" style="width:80px"></td>
+        <td><input type="number" name="unit_price[]" step="0.01" min="0" value="${price||'0.00'}" oninput="updateTotal()" style="width:90px"></td>
+        <td class="subtotal-cell mono" style="padding:8px 12px;">$0.00</td>
+        <td><button type="button" onclick="this.closest('tr').remove();updateTotal();" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;">×</button></td>
+    `;
+    document.getElementById('po-body').appendChild(tr);
+    updateTotal();
+}
+
+function fillPrice(sel) {
+    const opt = sel.selectedOptions[0];
+    const row = sel.closest('tr');
+    if (opt && opt.dataset.price) row.querySelector('[name="unit_price[]"]').value = parseFloat(opt.dataset.price).toFixed(2);
+    updateTotal();
+}
+
+function updateTotal() {
+    let total = 0;
+    document.querySelectorAll('.po-row').forEach(row => {
+        const qty   = parseFloat(row.querySelector('[name="quantity[]"]')?.value) || 0;
+        const price = parseFloat(row.querySelector('[name="unit_price[]"]')?.value) || 0;
+        const sub   = qty * price;
+        row.querySelector('.subtotal-cell').textContent = '$' + sub.toFixed(2);
+        total += sub;
+    });
+    document.getElementById('total-display').textContent = '$' + total.toFixed(2);
+}
+
+document.getElementById('add-row').addEventListener('click', () => addRow());
+
+// Pre-fill with low-stock products
+{% for p in prefill %}addRow({{ p.id }}, {{ p.reorder_quantity or 1 }}, {{ p.cost_price }});{% endfor %}
+{% if not po and not prefill %}addRow();{% endif %}
+
+updateTotal();
+</script>
+{% endblock %}

@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Receive Delivery — PO-{{ po.id }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div><h2>Receive Delivery</h2><div class="subtitle">// PO-{{ po.id }}{% if po.reference %} · {{ po.reference }}{% endif %}</div></div>
+    <a href="/purchase-orders/{{ po.id }}" class="btn btn-secondary">← Back to PO</a>
+</div>
+<div class="content">
+<div style="padding:12px 16px;background:rgba(124,106,247,0.08);border:1px solid rgba(124,106,247,0.2);border-radius:8px;margin-bottom:20px;font-size:13px;">
+    📦 Enter the quantity received for each item. Leave blank or 0 to skip. Received stock is immediately added to inventory.
+</div>
+<form method="post" action="/purchase-orders/{{ po.id }}/receive">
+<div class="card" style="padding:0;">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Ordered</th>
+                    <th>Already Received</th>
+                    <th>Outstanding</th>
+                    <th>Receiving Now</th>
+                    <th>Lot Number</th>
+                    <th>Expiry Date</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for item in po.items %}
+            {% if item.quantity_outstanding > 0 %}
+            <tr>
+                <td style="font-weight:700;">{{ item.product.name if item.product else '—' }}</td>
+                <td class="mono">{{ item.quantity_ordered }}</td>
+                <td class="mono" style="color:var(--text-muted);">{{ item.quantity_received }}</td>
+                <td class="mono" style="color:var(--danger);font-weight:700;">{{ item.quantity_outstanding }}</td>
+                <td>
+                    <input type="number" name="received_{{ item.id }}"
+                           step="0.01" min="0" max="{{ item.quantity_outstanding }}"
+                           value="{{ item.quantity_outstanding }}"
+                           style="width:90px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);">
+                </td>
+                <td>
+                    <input type="text" name="lot_{{ item.id }}"
+                           value="{{ item.lot_number or '' }}"
+                           placeholder="Optional"
+                           style="width:110px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:12px;">
+                </td>
+                <td>
+                    <input type="date" name="expiry_{{ item.id }}"
+                           value="{{ item.expiry_date.strftime('%Y-%m-%d') if item.expiry_date else (item.product.default_expiry_date.strftime('%Y-%m-%d') if item.product.default_expiry_date else '') }}"
+                           style="padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:12px;">
+                </td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+<div style="margin-top:20px;display:flex;gap:12px;">
+    <button type="submit" class="btn btn-primary">📦 Confirm Receipt &amp; Update Stock</button>
+    <a href="/purchase-orders/{{ po.id }}" class="btn btn-secondary">Cancel</a>
+</div>
+</form>
+</div>
+{% endblock %}

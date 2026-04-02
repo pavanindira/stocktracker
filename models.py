@@ -34,6 +34,7 @@ class Shop(Base):
     transactions = relationship("Transaction", back_populates="shop", cascade="all, delete-orphan")
     sub_users    = relationship("ShopSubUser", back_populates="shop", cascade="all, delete-orphan")
     suppliers    = relationship("Supplier",    back_populates="shop",    cascade="all, delete-orphan")
+    customers    = relationship("Customer",    back_populates="shop",    cascade="all, delete-orphan")
 
 
 class ShopSubUser(Base):
@@ -187,6 +188,7 @@ class TransactionType(str, enum.Enum):
     PURCHASE   = "purchase"
     SALE       = "sale"
     ADJUSTMENT = "adjustment"
+    RETURN     = "return"
 
 
 class DiscountType(str, enum.Enum):
@@ -212,10 +214,15 @@ class Transaction(Base):
     discount_amount  = Column(Float, default=0.0)   # computed discount in currency units
     share_token      = Column(String(64), unique=True, nullable=True, index=True)
     supplier_id      = Column(Integer, ForeignKey("suppliers.id"), nullable=True)
+    customer_id      = Column(Integer, ForeignKey("customers.id", ondelete="SET NULL"), nullable=True)
+    return_of_id     = Column(Integer, ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True)
 
     shop     = relationship("Shop",     back_populates="transactions")
     supplier = relationship("Supplier",  back_populates="transactions",
                              foreign_keys="[Transaction.supplier_id]")
+    customer = relationship("Customer",  back_populates="transactions",
+                             foreign_keys="[Transaction.customer_id]")
+    original = relationship("Transaction", foreign_keys="[Transaction.return_of_id]", remote_side="Transaction.id")
 
     @property
     def subtotal_before_discount(self) -> float:
@@ -345,3 +352,140 @@ class StocktakeItem(Base):
         if self.system_quantity == 0:
             return None
         return self.variance / self.system_quantity * 100
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Purchase Orders
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class POStatus(str, enum.Enum):
+    DRAFT             = "draft"
+    SENT              = "sent"
+    PARTIALLY_RECEIVED = "partially_received"
+    COMPLETED         = "completed"
+    CANCELLED         = "cancelled"
+
+
+class PurchaseOrder(Base):
+    __tablename__ = "purchase_orders"
+
+    id                = Column(Integer, primary_key=True, index=True)
+    shop_id           = Column(Integer, ForeignKey("shops.id"), nullable=False)
+    supplier_id       = Column(Integer, ForeignKey("suppliers.id"), nullable=True)
+    status            = Column(Enum(POStatus), default=POStatus.DRAFT)
+    reference         = Column(String(100), nullable=True)
+    notes             = Column(Text, nullable=True)
+    expected_delivery = Column(Date, nullable=True)
+    total_amount      = Column(Float, default=0.0)
+    created_at        = Column(DateTime(timezone=True), server_default=func.now())
+    sent_at           = Column(DateTime(timezone=True), nullable=True)
+    completed_at      = Column(DateTime(timezone=True), nullable=True)
+
+    shop     = relationship("Shop")
+    supplier = relationship("Supplier")
+    items    = relationship("PurchaseOrderItem", back_populates="purchase_order",
+                            cascade="all, delete-orphan")
+
+    @property
+    def items_received(self):
+        return all(i.quantity_received >= i.quantity_ordered for i in self.items)
+
+    @property
+    def items_partial(self):
+        return any(i.quantity_received > 0 for i in self.items) and not self.items_received
+
+
+class PurchaseOrderItem(Base):
+    __tablename__ = "purchase_order_items"
+
+    id                = Column(Integer, primary_key=True, index=True)
+    purchase_order_id = Column(Integer, ForeignKey("purchase_orders.id"), nullable=False)
+    product_id        = Column(Integer, ForeignKey("products.id"), nullable=False)
+    quantity_ordered  = Column(Float, nullable=False)
+    quantity_received = Column(Float, default=0.0)
+    unit_price        = Column(Float, default=0.0)
+    lot_number        = Column(String(100), nullable=True)
+    expiry_date       = Column(Date, nullable=True)
+
+    purchase_order = relationship("PurchaseOrder", back_populates="items")
+    product        = relationship("Product")
+
+    @property
+    def quantity_outstanding(self):
+        return max(0.0, self.quantity_ordered - self.quantity_received)
+
+    @property
+    def subtotal(self):
+        return round(self.quantity_ordered * self.unit_price, 2)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Customers
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class Customer(Base):
+    __tablename__ = "customers"
+
+    id             = Column(Integer, primary_key=True, index=True)
+    shop_id        = Column(Integer, ForeignKey("shops.id"), nullable=False)
+    name           = Column(String(200), nullable=False)
+    phone          = Column(String(50),  nullable=True)
+    email          = Column(String(200), nullable=True)
+    notes          = Column(Text,        nullable=True)
+    loyalty_points = Column(Float,       default=0.0)
+    is_active      = Column(Boolean,     default=True)
+    created_at     = Column(DateTime(timezone=True), server_default=func.now())
+
+    shop         = relationship("Shop")
+    transactions = relationship("Transaction", back_populates="customer",
+                                foreign_keys="Transaction.customer_id")
+
+    @property
+    def total_spent(self):
+        return round(sum(t.total_amount for t in self.transactions
+                         if t.transaction_type == TransactionType.SALE), 2)
+
+    @property
+    def visit_count(self):
+        return len([t for t in self.transactions
+                    if t.transaction_type == TransactionType.SALE])
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Audit Log
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    shop_id     = Column(Integer, ForeignKey("shops.id"), nullable=False)
+    actor_name  = Column(String(200), nullable=False)   # username of who did the action
+    actor_role  = Column(String(50),  nullable=True)    # owner / manager / cashier
+    action      = Column(String(100), nullable=False)   # e.g. SALE, PURCHASE, ADJUSTMENT, EDIT_PRODUCT
+    entity_type = Column(String(100), nullable=True)    # e.g. product, transaction, customer
+    entity_id   = Column(Integer,     nullable=True)
+    description = Column(Text,        nullable=True)
+    before_val  = Column(Text,        nullable=True)    # JSON string of before state
+    after_val   = Column(Text,        nullable=True)    # JSON string of after state
+    created_at  = Column(DateTime(timezone=True), server_default=func.now())
+
+    shop = relationship("Shop")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Device tokens (push notifications)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class DeviceToken(Base):
+    __tablename__ = "device_tokens"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    shop_id    = Column(Integer, ForeignKey("shops.id"), nullable=False)
+    token      = Column(String(512), nullable=False, index=True)
+    platform   = Column(String(20), nullable=True)   # android / ios
+    actor_name = Column(String(200), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
+
+    shop = relationship("Shop")

@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}PO-{{ po.id }} — StockTracker{% endblock %}
+{% block content %}
+{% set status_colors = {'draft': 'var(--text-muted)', 'sent': 'var(--accent)', 'partially_received': '#f5a623', 'completed': 'var(--success)', 'cancelled': 'var(--danger)'} %}
+<div class="page-header">
+    <div>
+        <h2>PO-{{ po.id }}{% if po.reference %} · {{ po.reference }}{% endif %}</h2>
+        <div class="subtitle">// PURCHASE ORDER ·
+            <span style="color:{{ status_colors[po.status.value] }};font-weight:800;">
+                {{ po.status.value | replace('_',' ') | upper }}
+            </span>
+        </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        {% if po.status.value == 'draft' %}
+        <a href="/purchase-orders/{{ po.id }}/edit" class="btn btn-secondary">Edit</a>
+        <form method="post" action="/purchase-orders/{{ po.id }}/send">
+            <button type="submit" class="btn btn-primary">✉ Mark as Sent</button>
+        </form>
+        {% endif %}
+        {% if po.status.value in ['sent','partially_received'] %}
+        <a href="/purchase-orders/{{ po.id }}/receive" class="btn btn-primary">📦 Receive Delivery</a>
+        {% endif %}
+        {% if po.status.value not in ['completed','cancelled'] %}
+        <form method="post" action="/purchase-orders/{{ po.id }}/cancel"
+              onsubmit="return confirm('Cancel this PO?')">
+            <button type="submit" class="btn btn-danger">Cancel</button>
+        </form>
+        {% endif %}
+        <a href="/purchase-orders" class="btn btn-ghost">← All POs</a>
+    </div>
+</div>
+<div class="content">
+<div class="grid-2" style="gap:20px;align-items:start;">
+
+    <div class="card">
+        <div class="card-title" style="margin-bottom:16px;">ORDER INFO</div>
+        <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+            <div><div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">SUPPLIER</div>
+            <div style="font-weight:700;">{{ po.supplier.name if po.supplier else '—' }}</div></div>
+            <div><div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">EXPECTED</div>
+            <div>{{ po.expected_delivery.strftime('%d %b %Y') if po.expected_delivery else '—' }}</div></div>
+            <div><div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">CREATED</div>
+            <div>{{ po.created_at.strftime('%d %b %Y %H:%M') if po.created_at else '—' }}</div></div>
+            {% if po.sent_at %}<div><div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">SENT</div>
+            <div>{{ po.sent_at.strftime('%d %b %Y %H:%M') }}</div></div>{% endif %}
+            {% if po.completed_at %}<div><div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">COMPLETED</div>
+            <div style="color:var(--success);font-weight:700;">{{ po.completed_at.strftime('%d %b %Y %H:%M') }}</div></div>{% endif %}
+        </div>
+        {% if po.notes %}
+        <div style="margin-top:14px;padding:10px 12px;background:var(--surface2);border-radius:6px;font-size:13px;color:var(--text-muted);">{{ po.notes }}</div>
+        {% endif %}
+    </div>
+
+    <div class="card" style="padding:0;">
+        <div style="padding:16px 20px 0;"><div class="card-title">LINE ITEMS</div></div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Product</th><th>Ordered</th><th>Received</th><th>Outstanding</th><th>Unit Price</th><th>Subtotal</th></tr></thead>
+                <tbody>
+                {% for item in po.items %}
+                <tr>
+                    <td style="font-weight:700;">{{ item.product.name if item.product else '—' }}
+                    {% if item.product.sku %}<div class="mono" style="font-size:10px;color:var(--text-muted);">{{ item.product.sku }}</div>{% endif %}
+                    </td>
+                    <td class="mono">{{ item.quantity_ordered }}</td>
+                    <td class="mono" style="color:{% if item.quantity_received >= item.quantity_ordered %}var(--success){% elif item.quantity_received > 0 %}#f5a623{% else %}var(--text-muted){% endif %};">
+                        {{ item.quantity_received }}
+                    </td>
+                    <td class="mono" style="color:{% if item.quantity_outstanding > 0 %}var(--danger){% else %}var(--success){% endif %};">
+                        {{ item.quantity_outstanding }}
+                    </td>
+                    <td class="mono">${{ "%.2f"|format(item.unit_price) }}</td>
+                    <td class="mono">${{ "%.2f"|format(item.subtotal) }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="5" style="text-align:right;padding:12px 16px;font-family:var(--font-mono);font-size:11px;color:var(--text-muted);letter-spacing:2px;">TOTAL</td>
+                        <td class="mono" style="font-weight:800;font-size:16px;color:var(--accent);">${{ "%.2f"|format(po.total_amount) }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+</div>
+{% endblock %}
