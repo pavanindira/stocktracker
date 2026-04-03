@@ -22,10 +22,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # ── ENUMS ────────────────────────────────────────────────────────────────
-    op.execute("CREATE TYPE IF NOT EXISTS userrole AS ENUM ('owner', 'manager', 'cashier')")
-    op.execute("CREATE TYPE IF NOT EXISTS transactiontype AS ENUM ('purchase', 'sale', 'adjustment')")
-    op.execute("CREATE TYPE IF NOT EXISTS discounttype AS ENUM ('none', 'percentage', 'fixed')")
-    op.execute("CREATE TYPE IF NOT EXISTS stocktakestatus AS ENUM ('draft', 'in_progress', 'completed')")
+    op.execute("DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'userrole') THEN CREATE TYPE userrole AS ENUM ('owner', 'manager', 'cashier'); END IF; END $$;")
+    op.execute("DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'transactiontype') THEN CREATE TYPE transactiontype AS ENUM ('purchase', 'sale', 'adjustment'); END IF; END $$;")
+    op.execute("DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'discounttype') THEN CREATE TYPE discounttype AS ENUM ('none', 'percentage', 'fixed'); END IF; END $$;")
+    op.execute("DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'stocktakestatus') THEN CREATE TYPE stocktakestatus AS ENUM ('draft', 'in_progress', 'completed'); END IF; END $$;")
 
     # ── shops ────────────────────────────────────────────────────────────────
     op.create_table(

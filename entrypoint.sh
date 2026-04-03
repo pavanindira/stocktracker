@@ -23,9 +23,9 @@ do
 done
 echo "✅ PostgreSQL is ready"
 
-echo "⬆️  Running Alembic migrations..."
-alembic upgrade head
-echo "✅ Migrations complete"
+#echo "⬆️  Running Alembic migrations..."
+#alembic upgrade head
+#echo "✅ Migrations complete"
 
 echo "🌱 Seeding admin..."
 python3 seed.py

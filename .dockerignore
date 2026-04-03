@@ -58,3 +58,4 @@ migrate_*.sql
 # Node (if any tooling was added)
 node_modules/
 npm-debug.log
+!alembic.ini

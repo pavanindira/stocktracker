@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
@@ -23,8 +23,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 # Copy installed packages from builder
-COPY --from=builder /root/.local /root/.local
-ENV PATH=/root/.local/bin:$PATH
+COPY --from=builder /install /usr/local
+ENV PATH=/usr/local/bin:$PATH
+ENV PYTHONPATH=/usr/local/lib/python3.12/site-packages
 
 # Copy application source
 COPY . .

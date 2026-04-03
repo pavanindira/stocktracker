@@ -9,7 +9,23 @@ import models
 import os
 from dotenv import load_dotenv
 
-from routers import auth_router, dashboard, products, transactions, reports, admin, categories, api, team, labels, import_csv, receipt_public, suppliers, stocktake, purchase_orders, customers, audit_router
+from routers.auth_router import router as auth_router
+from routers.dashboard import router as dashboard
+from routers.products import router as products
+from routers.transactions import router as transactions
+from routers.reports import router as reports
+from routers.admin import router as admin
+from routers.categories import router as categories
+from routers.api import router as api
+from routers.team import router as team
+from routers.labels import router as labels
+from routers.import_csv import router as import_csv
+from routers.receipt_public import router as receipt_public
+from routers.suppliers import router as suppliers
+from routers.stocktake import router as stocktake
+
+from routers.audit_router import router as audit_router
+from routers.csrf import CSRFProtectionMiddleware
 from seed import seed_admin
 
 load_dotenv()
@@ -57,11 +73,11 @@ async def lifespan(app):
     yield
     scheduler.shutdown()
 
+app = FastAPI(title="StockTracker", description="Multi-shop stock management system")
+
 # Only run scheduler if explicitly enabled - prevents duplicate jobs with multiple workers
 if os.getenv("RUN_SCHEDULER", "true").lower() == "true":
     app.router.lifespan_context = lifespan
-
-app = FastAPI(title="StockTracker", description="Multi-shop stock management system")
 
 SECRET_KEY = os.getenv("SECRET_KEY", "change-this-secret-key-in-production")
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
@@ -85,8 +101,7 @@ app.include_router(import_csv.router)
 app.include_router(receipt_public.router)
 app.include_router(suppliers.router)
 app.include_router(stocktake.router)
-app.include_router(purchase_orders.router)
-app.include_router(customers.router)
+
 app.include_router(audit_router.router)
 app.include_router(admin.router)
 app.include_router(api.router)
